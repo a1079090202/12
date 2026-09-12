@@ -88,7 +88,7 @@ class DisputeHandlingTest extends AbstractIntegrationTest {
         loginAs("carrier2");
         assertThatThrownBy(() -> disputeService.raise(
                 appt.getId(), "不是我的单也想提", carrierIdOf("carrier2"), userId("carrier2")))
-                .isInstanceOf(BusinessRuleException.class)
+                .isInstanceOf(org.springframework.security.access.AccessDeniedException.class)
                 .hasMessageContaining("本承运商");
 
         loginAs("carrier1");

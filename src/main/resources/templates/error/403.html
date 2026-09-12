@@ -1,0 +1,15 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('无权访问')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+  <div class="panel" style="max-width:640px">
+    <h2>403 · 无权访问该资源</h2>
+    <div class="flash err">你没有权限查看或操作这条记录（例如其他承运商的预约/核费单）。</div>
+    <p class="muted">页面按钮的显隐只是方便操作，服务端会对每一个请求做角色与数据归属校验。如确有需要，请联系调度员。</p>
+    <a class="btn" th:href="@{/}">回首页</a>
+  </div>
+</div>
+</body>
+</html>

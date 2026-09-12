@@ -8,6 +8,7 @@
     <p class="muted" style="margin-top:0">园区卸货月台预约 / 进场 / 排队 / 核费</p>
 
     <div th:if="${param.error}" class="flash err">用户名或密码错误</div>
+    <div th:if="${param.locked}" class="flash err">登录失败次数过多，账号已锁定 15 分钟，请稍后再试</div>
     <div th:if="${param.logout}" class="flash ok">已退出登录</div>
 
     <form class="stacked" th:action="@{/login}" method="post">
@@ -19,12 +20,6 @@
         <button class="btn" type="submit" style="width:100%">登录</button>
       </div>
     </form>
-
-    <div class="login-accounts">
-      初始化账号（密码相同）：<br>
-      承运商 <code>carrier1</code> / <code>carrier2</code><br>
-      门卫 <code>guard</code> · 仓库 <code>warehouse</code> · 调度 <code>dispatcher</code>
-    </div>
   </div>
 </div>
 </body>

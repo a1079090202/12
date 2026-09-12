@@ -38,7 +38,8 @@ public class GateService {
     @PreAuthorize("hasRole('GUARD')")
     public GateResult gateIn(String code, Long actorId) {
         String normalized = code == null ? "" : code.strip().toUpperCase();
-        Appointment appt = appointments.findByCode(normalized)
+        // 行锁串行化：两个门卫同时扫同一预约码时，后者在锁上等待，拿到后看到状态已推进
+        Appointment appt = appointments.lockByCode(normalized)
                 .orElseThrow(() -> new BusinessRuleException("预约码不存在：" + normalized));
 
         if (appt.getStatus() != AppointmentStatus.BOOKED && appt.getStatus() != AppointmentStatus.OVERRIDDEN) {
@@ -65,6 +66,7 @@ public class GateService {
         appt.setLateFlag(late);
         appt.setLateMinutes((int) lateMin);
         appt.setStatus(AppointmentStatus.GATED_IN);
+        appt.setUpdatedAt(now);
         appointments.save(appt);
 
         events.record(appt.getId(), EventType.GATE_IN, actorId, null,

@@ -5,12 +5,16 @@ import com.example.dockyard.security.CurrentUser;
 import com.example.dockyard.service.GateService;
 import com.example.dockyard.service.ReferenceData;
 import com.example.dockyard.service.YardClock;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 
 /** 门卫：输入预约码办理进场，看到在场车辆与今日预约。 */
 @Controller
+@Validated
 @RequestMapping("/gate")
 public class GateController {
 
@@ -39,7 +43,8 @@ public class GateController {
     }
 
     @PostMapping("/in")
-    public String gateIn(@RequestParam String code, Model model) {
+    public String gateIn(@RequestParam @NotBlank(message = "预约码不能为空")
+                         @Size(max = 24, message = "预约码最长 24 个字符") String code, Model model) {
         var result = gate.gateIn(code, CurrentUser.id());
         model.addAttribute("result", result);
         return page(model);

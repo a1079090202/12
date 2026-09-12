@@ -4,7 +4,6 @@ import com.example.dockyard.domain.*;
 import com.example.dockyard.repo.*;
 import com.example.dockyard.service.FeeService;
 import com.example.dockyard.service.YardClock;
-import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,17 +18,17 @@ import java.time.LocalDate;
 
 /**
  * 启动初始化（库为空时执行，可重复启动不重复造数）：
- *  - 4 类角色账号；2 家承运商；6 个月台；
- *  - 两家承运商今/明两日费率（跨费率日期演示用）；
- *  - 20 条今日样例预约：16 条已预约、1 条等候中、1 条卸货中、
- *    1 条已出场（含核费单，可直接对账/提异议），另 1 条已插单。
- * 初始密码统一 dock1234，见 README。
+ *  - dev profile（app.seed.demo-accounts=true）：4 类角色演示账号、2 家承运商、6 个月台、
+ *    费率与 20 条样例预约；演示密码统一 dock1234（见 README，仅限本地）；
+ *  - 生产默认不播种任何账号/数据；若提供 ADMIN_USERNAME / ADMIN_PASSWORD 环境变量，
+ *    则创建首个 DISPATCHER 管理员（BCrypt 加密，密码不打日志），否则不建任何账号。
  */
 @Component
 public class DataInitializer implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
     private static final String INIT_PASSWORD = "dock1234";
+    private static final int MIN_ADMIN_PASSWORD_LENGTH = 8;
 
     private final AppUserRepository users;
     private final CarrierRepository carriers;
@@ -39,15 +38,28 @@ public class DataInitializer implements CommandLineRunner {
     private final FeeService feeService;
     private final PasswordEncoder encoder;
     private final YardClock clock;
-    private final EntityManager em;
+    private final com.example.dockyard.service.AppointmentCodeGenerator codeGenerator;
 
-    @Value("${app.seed.sample:true}")
+    @Value("${app.seed.sample:false}")
     private boolean seedSample;
+
+    @Value("${app.slot.length-minutes:30}")
+    private int slotMinutes;
+
+    @Value("${app.seed.demo-accounts:false}")
+    private boolean demoAccounts;
+
+    @Value("${app.bootstrap.admin-username:}")
+    private String adminUsername;
+
+    @Value("${app.bootstrap.admin-password:}")
+    private String adminPassword;
 
     public DataInitializer(AppUserRepository users, CarrierRepository carriers,
                            CarrierDailyRateRepository rates, DockRepository docks,
                            AppointmentRepository appointments, FeeService feeService,
-                           PasswordEncoder encoder, YardClock clock, EntityManager em) {
+                           PasswordEncoder encoder, YardClock clock,
+                           com.example.dockyard.service.AppointmentCodeGenerator codeGenerator) {
         this.users = users;
         this.carriers = carriers;
         this.rates = rates;
@@ -56,7 +68,7 @@ public class DataInitializer implements CommandLineRunner {
         this.feeService = feeService;
         this.encoder = encoder;
         this.clock = clock;
-        this.em = em;
+        this.codeGenerator = codeGenerator;
     }
 
     @Override
@@ -65,7 +77,38 @@ public class DataInitializer implements CommandLineRunner {
         if (users.count() > 0) {
             return;
         }
+        if (demoAccounts) {
+            seedDemoData();
+        } else {
+            seedAdminFromEnv();
+        }
+    }
 
+    /** 生产引导：仅在显式提供 ADMIN_USERNAME/ADMIN_PASSWORD 时创建首个调度管理员 */
+    private void seedAdminFromEnv() {
+        boolean hasName = adminUsername != null && !adminUsername.isBlank();
+        boolean hasPassword = adminPassword != null && !adminPassword.isBlank();
+        if (!hasName || !hasPassword) {
+            log.warn("空库且未配置 ADMIN_USERNAME/ADMIN_PASSWORD：未创建任何账号，"
+                    + "请配置环境变量后重启，或通过 SQL 手工初始化");
+            return;
+        }
+        if (adminPassword.strip().length() < MIN_ADMIN_PASSWORD_LENGTH) {
+            throw new IllegalStateException(
+                    "ADMIN_PASSWORD 长度至少 " + MIN_ADMIN_PASSWORD_LENGTH + " 位，拒绝弱口令启动");
+        }
+        AppUser admin = new AppUser();
+        admin.setUsername(adminUsername.strip());
+        admin.setDisplayName("系统管理员");
+        admin.setRole(Role.DISPATCHER);
+        admin.setCarrierId(null);
+        admin.setPasswordHash(encoder.encode(adminPassword.strip()));
+        admin.setCreatedAt(clock.now());
+        users.save(admin);
+        log.info("已创建初始管理员账号：{}（请登录后尽快修改密码）", adminUsername.strip());
+    }
+
+    private void seedDemoData() {
         Carrier c1 = carrier("SD", "顺达物流");
         Carrier c2 = carrier("LX", "冷鲜运输");
 
@@ -89,7 +132,8 @@ public class DataInitializer implements CommandLineRunner {
         Long whId = user("warehouse", "仓管小李", Role.WAREHOUSE, null);
         Long dispId = user("dispatcher", "调度老赵", Role.DISPATCHER, null);
 
-        log.info("初始化账号完成，初始密码均为 {}", INIT_PASSWORD);
+        log.info("已创建演示账号（dev profile）：carrier1/carrier2/guard/warehouse/dispatcher，"
+                + "初始密码见 README，切勿用于生产");
 
         if (seedSample && appointments.count() == 0) {
             seedAppointments(c1Id, c2Id, guardId, whId, dispId);
@@ -113,7 +157,7 @@ public class DataInitializer implements CommandLineRunner {
             if (i == 11) {
                 type = DockType.OVERSIZE;
             }
-            Instant start = clock.truncateToSlot(clock.parseDateTime(today, times[i]), 30);
+            Instant start = clock.truncateToSlot(clock.parseDateTime(today, times[i]), slotMinutes);
             saveBooked(carrierId, "SO-" + today.toString().replace("-", "") + "-" + (i + 1),
                     "沪A" + String.format("%04d", 1001 + i), "司机" + (i + 1),
                     type == DockType.COLD ? cargoCold[i % 2] : cargoStd[i % 4],
@@ -121,21 +165,21 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         // 1 条插单（08:30 槽，写原因）
-        Instant overSlot = clock.truncateToSlot(clock.parseDateTime(today, "08:30"), 30);
+        Instant overSlot = clock.truncateToSlot(clock.parseDateTime(today, "08:30"), slotMinutes);
         Appointment over = saveBooked(c1, "SO-URGENT-01", "沪B09001", "加急司机",
                 "加急电子配件", DockType.STANDARD, overSlot,
                 AppointmentStatus.OVERRIDDEN, "客户产线停工待料，调度插单", dispId);
 
         // 1 条已进场在等候（20 分钟前到）
         Instant arrived = clock.now().minusSeconds(20 * 60);
-        Instant waitSlot = clock.truncateToSlot(arrived, 30);
+        Instant waitSlot = clock.truncateToSlot(arrived, slotMinutes);
         Appointment waiting = saveBooked(c1, "SO-WAIT-01", "沪A00021", "等候司机",
                 "日化百货", DockType.STANDARD, waitSlot, AppointmentStatus.GATED_IN, null, null);
         waiting.setArrivedAt(arrived);
         appointments.save(waiting);
 
         // 1 条卸货中（占用 D1）
-        Instant unloadSlot = clock.truncateToSlot(clock.parseDateTime(today, "07:00"), 30);
+        Instant unloadSlot = clock.truncateToSlot(clock.parseDateTime(today, "07:00"), slotMinutes);
         Appointment unloading = saveBooked(c1, "SO-LIVE-01", "沪A00022", "作业司机",
                 "常温食品", DockType.STANDARD, unloadSlot, AppointmentStatus.UNLOADING, null, null);
         unloading.setAssignedDockId(docks.findByActiveTrueOrderByCode().get(0).getId());
@@ -147,7 +191,7 @@ public class DataInitializer implements CommandLineRunner {
         appointments.save(unloading);
 
         // 1 条已出场：等待 150 分钟，免费 90，计费 60 分钟（今日费率 60 元/时 -> 60.00 元）
-        Instant exitSlot = clock.truncateToSlot(clock.parseDateTime(today, "06:30"), 30);
+        Instant exitSlot = clock.truncateToSlot(clock.parseDateTime(today, "06:30"), slotMinutes);
         Appointment exited = saveBooked(c1, "SO-DONE-01", "沪A00023", "离场司机",
                 "服装", DockType.STANDARD, exitSlot, AppointmentStatus.EXITED, null, null);
         exited.setArrivedAt(clock.parseDateTime(today, "09:00"));
@@ -166,7 +210,7 @@ public class DataInitializer implements CommandLineRunner {
                                    String cargo, DockType type, Instant slotStart,
                                    AppointmentStatus status, String overrideReason, Long overrideBy) {
         Appointment a = new Appointment();
-        a.setCode(nextCode());
+        a.setCode(codeGenerator.next(slotStart));
         a.setCarrierId(carrierId);
         a.setOrderNo(orderNo);
         a.setPlateNo(plate);
@@ -174,11 +218,14 @@ public class DataInitializer implements CommandLineRunner {
         a.setCargoType(cargo);
         a.setDockType(type);
         a.setSlotStart(slotStart);
-        a.setSlotEnd(slotStart.plusSeconds(30 * 60));
+        a.setSlotEnd(slotStart.plusSeconds(slotMinutes * 60L));
         a.setStatus(status);
         a.setOverrideReason(overrideReason);
         a.setOverriddenBy(overrideBy);
         a.setCreatedBy(overrideBy);
+        java.time.Instant now = clock.now();
+        a.setCreatedAt(now);
+        a.setUpdatedAt(now);
         return appointments.save(a);
     }
 
@@ -186,6 +233,7 @@ public class DataInitializer implements CommandLineRunner {
         Carrier c = new Carrier();
         c.setCode(code);
         c.setName(name);
+        c.setCreatedAt(clock.now());
         return carriers.save(c);
     }
 
@@ -194,6 +242,7 @@ public class DataInitializer implements CommandLineRunner {
         r.setCarrierId(c.getId());
         r.setRateDate(date);
         r.setRatePerHour(new BigDecimal(perHour));
+        r.setCreatedAt(clock.now());
         rates.save(r);
     }
 
@@ -212,13 +261,7 @@ public class DataInitializer implements CommandLineRunner {
         u.setRole(role);
         u.setCarrierId(carrierId);
         u.setPasswordHash(encoder.encode(INIT_PASSWORD));
+        u.setCreatedAt(clock.now());
         return users.save(u).getId();
-    }
-
-    private String nextCode() {
-        Long seq = ((Number) em.createNativeQuery("select nextval('appt_code_seq')")
-                .getSingleResult()).longValue();
-        String dayPart = clock.today().format(java.time.format.DateTimeFormatter.ofPattern("yyMMdd"));
-        return "YY" + dayPart + String.format("%04d", seq % 10000);
     }
 }

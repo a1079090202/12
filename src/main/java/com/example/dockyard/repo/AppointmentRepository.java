@@ -23,6 +23,11 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
     @Query("select a from Appointment a where a.id = :id")
     Optional<Appointment> lockById(@Param("id") Long id);
 
+    /** 门卫扫码进场时按预约码对预约行加悲观锁，串行化同码的并发进场 */
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select a from Appointment a where a.code = :code")
+    Optional<Appointment> lockByCode(@Param("code") String code);
+
     /** 派台前对月台行加锁（由服务层调用 native/实体锁），配合部分唯一索引双保险 */
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select d from Dock d where d.id = :id")

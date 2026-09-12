@@ -53,7 +53,7 @@ public class FeeSettlement {
     private Long generatedBy;
 
     @Column(name = "generated_at", nullable = false)
-    private Instant generatedAt = Instant.now();
+    private Instant generatedAt;
 
     public Long getId() { return id; }
     public Long getAppointmentId() { return appointmentId; }
@@ -81,4 +81,5 @@ public class FeeSettlement {
     public Long getGeneratedBy() { return generatedBy; }
     public void setGeneratedBy(Long generatedBy) { this.generatedBy = generatedBy; }
     public Instant getGeneratedAt() { return generatedAt; }
+    public void setGeneratedAt(Instant generatedAt) { this.generatedAt = generatedAt; }
 }

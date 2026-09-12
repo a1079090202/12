@@ -31,7 +31,7 @@ public class AppUser {
     private boolean active = true;
 
     @Column(name = "created_at", nullable = false)
-    private Instant createdAt = Instant.now();
+    private Instant createdAt;
 
     public Long getId() { return id; }
     public String getUsername() { return username; }
@@ -47,4 +47,5 @@ public class AppUser {
     public boolean isActive() { return active; }
     public void setActive(boolean active) { this.active = active; }
     public Instant getCreatedAt() { return createdAt; }
+    public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
 }

@@ -41,7 +41,7 @@ public class AppointmentDetailController {
         LoginUser me = CurrentUser.get();
         if (me.getRole() == com.example.dockyard.domain.Role.CARRIER
                 && !appt.getCarrierId().equals(me.getCarrierId())) {
-            throw new BusinessRuleException("只能查看本承运商的预约");
+            throw new org.springframework.security.access.AccessDeniedException("只能查看本承运商的预约");
         }
 
         var settlement = fees.peekByAppointment(id);

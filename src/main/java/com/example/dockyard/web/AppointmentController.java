@@ -7,11 +7,15 @@ import com.example.dockyard.security.LoginUser;
 import com.example.dockyard.service.AppointmentService;
 import com.example.dockyard.service.BusinessRuleException;
 import com.example.dockyard.service.YardClock;
+import jakarta.validation.Valid;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -22,48 +26,44 @@ import java.util.List;
 @RequestMapping("/appointments")
 public class AppointmentController {
 
-    /** 30 分钟整点时段选项 00:00–23:30 */
-    static final List<String> SLOT_TIMES = buildSlotTimes();
-
-    private static List<String> buildSlotTimes() {
-        List<String> times = new ArrayList<>(48);
-        for (int h = 0; h < 24; h++) {
-            times.add(String.format("%02d:00", h));
-            times.add(String.format("%02d:30", h));
-        }
-        return times;
-    }
-
     private final AppointmentService appointments;
     private final CarrierRepository carriers;
     private final YardClock clock;
+    private final int slotMinutes;
 
-    public AppointmentController(AppointmentService appointments, CarrierRepository carriers, YardClock clock) {
+    public AppointmentController(AppointmentService appointments, CarrierRepository carriers, YardClock clock,
+                                 @Value("${app.slot.length-minutes:30}") int slotMinutes) {
         this.appointments = appointments;
         this.carriers = carriers;
         this.clock = clock;
+        this.slotMinutes = slotMinutes;
+    }
+
+    /** 按配置的时段时长（app.slot.length-minutes）生成 00:00 起的全天整点时段选项 */
+    private List<String> slotTimes() {
+        if (slotMinutes <= 0 || 1440 % slotMinutes != 0) {
+            throw new IllegalStateException("app.slot.length-minutes 必须是能整除 1440 的正整数，当前=" + slotMinutes);
+        }
+        List<String> times = new ArrayList<>(1440 / slotMinutes);
+        for (int minute = 0; minute < 1440; minute += slotMinutes) {
+            times.add(LocalTime.ofSecondOfDay(minute * 60L).toString());
+        }
+        return times;
     }
 
     @GetMapping("/new")
     public String newForm(Model model) {
         model.addAttribute("dockTypes", DockType.values());
-        model.addAttribute("slotTimes", SLOT_TIMES);
+        model.addAttribute("slotTimes", slotTimes());
         model.addAttribute("today", clock.today());
         return "appointment/form";
     }
 
     @PostMapping
-    public String book(@RequestParam String orderNo,
-                       @RequestParam String plateNo,
-                       @RequestParam String driverName,
-                       @RequestParam(required = false) String driverPhone,
-                       @RequestParam String cargoType,
-                       @RequestParam DockType dockType,
-                       @RequestParam LocalDate slotDate,
-                       @RequestParam String slotTime) {
+    public String book(@Valid BookingForm form, BindingResult br) {
+        rejectIfInvalid(br);
         LoginUser me = CurrentUser.get();
-        var req = new AppointmentService.BookingRequest(
-                orderNo, plateNo, driverName, driverPhone, cargoType, dockType, slotDate, slotTime);
+        var req = toRequest(form);
         var appt = appointments.book(req, me.getCarrierId(), me.getId());
         return "redirect:/appointments/" + appt.getId() + "?booked=1";
     }
@@ -80,29 +80,23 @@ public class AppointmentController {
     public String overrideForm(Model model) {
         model.addAttribute("dockTypes", DockType.values());
         model.addAttribute("carriers", carriers.findAll());
-        model.addAttribute("slotTimes", SLOT_TIMES);
+        model.addAttribute("slotTimes", slotTimes());
         model.addAttribute("today", clock.today());
         return "appointment/override";
     }
 
     @PostMapping("/override")
-    public String override(@RequestParam Long carrierId,
-                           @RequestParam String orderNo,
-                           @RequestParam String plateNo,
-                           @RequestParam String driverName,
-                           @RequestParam(required = false) String driverPhone,
-                           @RequestParam String cargoType,
-                           @RequestParam DockType dockType,
-                           @RequestParam LocalDate slotDate,
-                           @RequestParam String slotTime,
-                           @RequestParam String reason) {
+    public String override(@Valid BookingForm form, BindingResult br) {
+        rejectIfInvalid(br);
         LoginUser me = CurrentUser.get();
-        if (carrierId == null) {
+        if (form.getCarrierId() == null) {
             throw new BusinessRuleException("插单必须选择承运商");
         }
-        var req = new AppointmentService.BookingRequest(
-                orderNo, plateNo, driverName, driverPhone, cargoType, dockType, slotDate, slotTime);
-        var appt = appointments.override(req, carrierId, me.getId(), reason);
+        if (form.getReason() == null || form.getReason().strip().isBlank()) {
+            throw new BusinessRuleException("插单必须写明原因");
+        }
+        var req = toRequest(form);
+        var appt = appointments.override(req, form.getCarrierId(), me.getId(), form.getReason().strip());
         return "redirect:/appointments/" + appt.getId() + "?overridden=1";
     }
 
@@ -110,5 +104,20 @@ public class AppointmentController {
     public String cancel(@PathVariable Long id) {
         appointments.cancel(id, CurrentUser.id());
         return "redirect:/appointments/" + id;
+    }
+
+    private AppointmentService.BookingRequest toRequest(BookingForm f) {
+        return new AppointmentService.BookingRequest(
+                f.getOrderNo(), f.getPlateNo(), f.getDriverName(), f.getDriverPhone(),
+                f.getCargoType(), f.getDockType(), f.getSlotDate(), f.getSlotTime());
+    }
+
+    private void rejectIfInvalid(BindingResult br) {
+        if (br.hasErrors()) {
+            throw new BusinessRuleException(br.getFieldErrors().stream()
+                    .findFirst()
+                    .map(fe -> fe.getDefaultMessage())
+                    .orElse("提交的参数不合法，请检查后重试"));
+        }
     }
 }

@@ -15,6 +15,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.test.context.ActiveProfiles;
 
 import java.io.IOException;
 import java.time.Clock;
@@ -26,6 +27,7 @@ import java.util.List;
  * （例如异议调整过金额的样例单不会影响后续对账用例）。
  */
 @SpringBootTest
+@ActiveProfiles("dev")
 public abstract class AbstractIntegrationTest {
 
     static final EmbeddedPostgres PG;

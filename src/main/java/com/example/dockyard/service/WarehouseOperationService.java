@@ -54,6 +54,7 @@ public class WarehouseOperationService {
         long waitMinutes = clock.minutesBetween(appt.getArrivedAt(), now);
         appt.setWaitMinutes((int) waitMinutes);
         appt.setStatus(AppointmentStatus.DOCKED);
+        appt.setUpdatedAt(now);
         appointments.save(appt);
         events.record(apptId, EventType.DOCK, actorId, dockId,
                 "靠台，进场后等待 " + waitMinutes + " 分钟");
@@ -67,7 +68,9 @@ public class WarehouseOperationService {
         if (appt.getStatus() != AppointmentStatus.DOCKED) {
             throw new BusinessRuleException("车辆当前为「" + appt.getStatus().getLabel() + "」，尚未靠台");
         }
-        appt.setUnloadStartAt(clock.now());
+        Instant now = clock.now();
+        appt.setUnloadStartAt(now);
+        appt.setUpdatedAt(now);
         appt.setStatus(AppointmentStatus.UNLOADING);
         appointments.save(appt);
         events.record(apptId, EventType.START_UNLOAD, actorId, appt.getAssignedDockId(), "开始卸货");
@@ -81,7 +84,9 @@ public class WarehouseOperationService {
         if (appt.getStatus() != AppointmentStatus.UNLOADING) {
             throw new BusinessRuleException("车辆当前为「" + appt.getStatus().getLabel() + "」，未在卸货");
         }
-        appt.setCompletedAt(clock.now());
+        Instant now = clock.now();
+        appt.setCompletedAt(now);
+        appt.setUpdatedAt(now);
         appt.setStatus(AppointmentStatus.COMPLETED);
         appointments.save(appt);
         events.record(apptId, EventType.COMPLETE, actorId, appt.getAssignedDockId(), "卸货完成");
@@ -99,6 +104,7 @@ public class WarehouseOperationService {
         }
         Instant now = clock.now();
         appt.setExitedAt(now);
+        appt.setUpdatedAt(now);
         appt.setStatus(AppointmentStatus.EXITED);
         appointments.save(appt);
         events.record(apptId, EventType.EXIT, actorId, appt.getAssignedDockId(), "车辆出场");
