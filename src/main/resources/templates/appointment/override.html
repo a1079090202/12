@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('调度插单')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+  <div class="panel" style="max-width:640px">
+    <h2>调度插单（超额预约）</h2>
+    <div class="flash warn">插单会绕过 30 分钟容量限制，<b>必须写明原因</b>，原因与操作人将永久留痕。</div>
+    <form class="stacked" th:action="@{/appointments/override}" method="post">
+      <label>承运商</label>
+      <select name="carrierId" required>
+        <option th:each="c : ${carriers}" th:value="${c.id}" th:text="${c.name}"></option>
+      </select>
+      <label>订单号</label>
+      <input name="orderNo" required>
+      <label>车牌号</label>
+      <input name="plateNo" required>
+      <label>司机姓名</label>
+      <input name="driverName" required>
+      <label>司机电话</label>
+      <input name="driverPhone">
+      <label>货类</label>
+      <input name="cargoType" required>
+      <label>所需月台类型</label>
+      <select name="dockType" required>
+        <option th:each="t : ${dockTypes}" th:value="${t}" th:text="${t.label}"></option>
+      </select>
+      <label>预计到达日期</label>
+      <input type="date" name="slotDate" th:min="${today}" required>
+      <label>预计到达时段</label>
+      <select name="slotTime" required>
+        <option th:each="t : ${slotTimes}" th:value="${t}" th:text="${t}"></option>
+      </select>
+      <label>插单原因（必填）</label>
+      <textarea name="reason" rows="3" required placeholder="如：客户加急 / 前序车辆已提前离场释放产能"></textarea>
+      <div style="margin-top:16px"><button class="btn" type="submit">确认插单</button></div>
+    </form>
+  </div>
+</div>
+</body>
+</html>

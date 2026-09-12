@@ -1,0 +1,35 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: dockyard
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/dockyard}
+    username: ${DB_USER:dockyard}
+    password: ${DB_PASSWORD:dockyard}
+    hikari:
+      maximum-pool-size: 20
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        jdbc:
+          time_zone: Asia/Shanghai
+  flyway:
+    enabled: true
+    locations: classpath:db/migration
+  thymeleaf:
+    cache: false
+
+app:
+  timezone: Asia/Shanghai
+  slot:
+    length-minutes: 30
+    capacity: 6          # 每个 30 分钟时段最多预约车辆数（6 个月台）
+  fee:
+    free-minutes: 90     # 免费等候时长（分钟）
+  seed:
+    sample: ${SEED_SAMPLE:true}   # 启动时若库为空则写入初始化账号以外的 20 条样例预约

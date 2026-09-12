@@ -1,0 +1,28 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(java -version)",
+      "Bash(mvn -version)",
+      "Bash(docker --version)",
+      "Bash(docker compose *)",
+      "Read(//usr/lib/**)",
+      "Read(//opt/**)",
+      "Bash(timeout 40 bash -c 'apt-get install -y --no-install-recommends openjdk-21-jdk-headless maven >/tmp/apt.log 2>&1; echo exit=$?')",
+      "Read(//tmp/**)",
+      "Bash(sudo -n true)",
+      "Bash(timeout 15 curl -sI https://github.com -o /dev/null -w '%{http_code}\\\\n')",
+      "Bash(ldd --version)",
+      "Read(//home/node/tools/**)",
+      "Bash(tar xzf *)",
+      "Bash(~/tools/jdk-*/bin/java -version)",
+      "Bash(jobs -l)",
+      "Bash(cd *)",
+      "Bash(export JAVA_HOME=$HOME/tools/jdk-21.0.12.1+1)",
+      "Bash(/home/node/tools/apache-maven-3.9.9/bin/mvn -v)",
+      "Bash(export *)",
+      "Bash(awk '{print $2, $11, $12, $13}')",
+      "Bash(/tmp/embedded-pg/PG-1a75b2fdb57c5cfc8674f29ebb0d831b/bin/pg_ctl -D /tmp/pgdata-smoke -m fast stop)",
+      "Bash(awk '{print $2,$11,$12,$13}')"
+    ]
+  }
+}

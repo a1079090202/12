@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('预约详情')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+
+  <div th:if="${param.booked}" class="flash ok">预约成功！请记下预约码，到场时向门卫出示。</div>
+  <div th:if="${param.overridden}" class="flash warn">插单成功，该单已记录插单原因与操作人。</div>
+
+  <div class="grid grid-2">
+    <div class="panel">
+      <h2>预约 <span class="mono" th:text="${appt.code}"></span>
+        <span class="badge info" th:text="${appt.status.label}"></span>
+        <span th:if="${appt.lateFlag}" class="badge late">迟到 <span th:text="${appt.lateMinutes}"></span> 分钟</span>
+        <span th:if="${appt.earlyArrival}" class="badge early">早到等候</span>
+      </h2>
+      <table>
+        <tr><th>承运商</th><td th:text="${ref.carrierName(appt.carrierId)}"></td></tr>
+        <tr><th>订单号</th><td th:text="${appt.orderNo}"></td></tr>
+        <tr><th>车牌</th><td class="mono" th:text="${appt.plateNo}"></td></tr>
+        <tr><th>司机</th><td th:text="${appt.driverName} + (${appt.driverPhone != null} ? ' ' + ${appt.driverPhone} : '')"></td></tr>
+        <tr><th>货类</th><td th:text="${appt.cargoType}"></td></tr>
+        <tr><th>所需月台</th><td th:text="${appt.dockType.label}"></td></tr>
+        <tr><th>预计时段</th><td th:text="${clock.formatDateTime(appt.slotStart)} + ' - ' + ${clock.formatTime(appt.slotEnd)}"></td></tr>
+        <tr th:if="${appt.overrideReason}"><th>插单原因</th>
+          <td><span class="badge early">插单</span> <span th:text="${appt.overrideReason}"></span></td></tr>
+        <tr th:if="${appt.assignedDockId}"><th>分配月台</th>
+          <td th:text="${ref.dockCode(appt.assignedDockId)}"></td></tr>
+      </table>
+
+      <div th:if="${settlement}" style="margin-top:18px">
+        <h3>出场核费</h3>
+        <table>
+          <tr><th>等待分钟</th><td th:text="${appt.waitMinutes}"></td></tr>
+          <tr><th>免费分钟</th><td th:text="${settlement.freeMinutes}"></td></tr>
+          <tr><th>计费分钟</th><td th:text="${settlement.chargeableMinutes}"></td></tr>
+          <tr><th>原始金额</th><td><b th:text="${#numbers.formatDecimal(settlement.originalAmount,1,2)} + ' 元'"></b>
+            <span class="muted">（系统核算，不可修改）</span></td></tr>
+          <tr><th>最终金额</th><td><b th:text="${#numbers.formatDecimal(settlement.finalAmount,1,2)} + ' 元'"></b></td></tr>
+          <tr><th>核费状态</th><td><span class="badge info" th:text="${settlement.status}"></span></td></tr>
+        </table>
+        <table th:if="${!segments.isEmpty()}" style="margin-top:8px">
+          <thead><tr><th>费率日期</th><th>分钟</th><th>费率快照(元/时)</th><th>金额</th></tr></thead>
+          <tbody>
+          <tr th:each="s : ${segments}">
+            <td th:text="${s.segmentDate}"></td>
+            <td th:text="${s.minutes}"></td>
+            <td th:text="${#numbers.formatDecimal(s.ratePerHour,1,2)}"></td>
+            <td th:text="${#numbers.formatDecimal(s.amount,1,2)}"></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="panel">
+      <h2>操作时间线（操作人 + 时间，全程留痕）</h2>
+      <ul class="timeline">
+        <li th:each="te : ${events}">
+          <div th:text="${te.event.eventType.label}">事件</div>
+          <div th:if="${te.event.detail}" class="muted" th:text="${te.event.detail}"></div>
+          <div class="when">
+            <span th:text="${clock.formatDateTime(te.event.occurredAt)}"></span> ·
+            <span th:text="${te.actorName}"></span>
+          </div>
+        </li>
+      </ul>
+
+      <div sec:authorize="hasRole('CARRIER')" th:if="${settlement != null}" style="margin-top:18px">
+        <h3>对核费有异议？</h3>
+        <div th:if="${settlement.status.name() == 'DISPUTED'}" class="flash warn">该单异议处理中。</div>
+        <div th:unless="${settlement.status.name() == 'DISPUTED'}" class="flash warn">
+          提起异议不会删除或改变原始核费金额与记录。
+        </div>
+        <form class="stacked" th:action="@{/disputes/raise}" method="post"
+              th:if="${settlement.status.name() != 'DISPUTED'}">
+          <input type="hidden" name="appointmentId" th:value="${appt.id}">
+          <label>异议原因</label>
+          <textarea name="reason" rows="3" required placeholder="如：等待系月台故障导致，非承运商责任"></textarea>
+          <div style="margin-top:10px"><button class="btn" type="submit">提交异议</button></div>
+        </form>
+      </div>
+
+      <div th:if="${!disputes.isEmpty()}" style="margin-top:18px">
+        <h3>异议记录</h3>
+        <table>
+          <thead><tr><th>提出时间</th><th>原因</th><th>状态</th><th>原金额</th><th>调整为</th><th>处理说明</th></tr></thead>
+          <tbody>
+          <tr th:each="d : ${disputes}">
+            <td class="nowrap" th:text="${clock.formatDateTime(d.raisedAt)}"></td>
+            <td th:text="${d.reason}"></td>
+            <td><span class="badge early" th:if="${d.status.name()=='OPEN'}">待处理</span>
+                <span class="badge free" th:if="${d.status.name()=='ADJUSTED'}">已调整</span>
+                <span class="badge gray" th:if="${d.status.name()=='REJECTED'}">已驳回</span></td>
+            <td th:text="${#numbers.formatDecimal(d.originalAmount,1,2)}"></td>
+            <td th:text="${d.adjustedAmount != null ? #numbers.formatDecimal(d.adjustedAmount,1,2) : '-'}"></td>
+            <td th:text="${d.resolutionNote} ?: '-'"></td>
+          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <p style="margin-top:16px"><a th:href="@{/}">← 返回首页</a></p>
+</div>
+</body>
+</html>

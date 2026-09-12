@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('排队叫号')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+  <div class="panel">
+    <h2>等候队列 · 叫号派台
+      <a class="btn small secondary" style="float:right" th:href="@{/appointments/override}">调度插单</a>
+    </h2>
+    <p class="muted">队列按车辆实际进场先后排序。选择月台派台；不选则按所需类型自动分配空闲月台。同月台并发派车只会成功一单。</p>
+    <table>
+      <thead><tr>
+        <th>序</th><th>车牌</th><th>货类</th><th>需要月台</th><th>进场时间</th>
+        <th>已等候</th><th>标记</th><th style="width:280px">派台操作</th>
+      </tr></thead>
+      <tbody>
+      <tr th:each="a, it : ${waiting}">
+        <td th:text="${it.count}"></td>
+        <td class="mono"><a th:href="@{/appointments/{id}(id=${a.id})}" th:text="${a.plateNo}"></a></td>
+        <td th:text="${a.cargoType}"></td>
+        <td th:text="${a.dockType.label}"></td>
+        <td class="nowrap" th:text="${clock.formatTime(a.arrivedAt)}"></td>
+        <td class="nowrap waiting-min" th:attr="data-since=${a.arrivedAt.epochSecond}">—</td>
+        <td>
+          <span th:if="${a.lateFlag}" class="badge late">迟到 <span th:text="${a.lateMinutes}"></span>分</span>
+          <span th:if="${a.earlyArrival}" class="badge early">早到</span>
+          <span th:if="${a.status.name()=='CALLED'}" class="badge info">已派台</span>
+        </td>
+        <td>
+          <form class="inline" th:action="@{/dispatch/call}" method="post" style="display:flex;gap:6px">
+            <input type="hidden" name="apptId" th:value="${a.id}">
+            <select name="dockId">
+              <option value="">自动分配</option>
+              <option th:each="d : ${docks}" th:value="${d.id}"
+                      th:text="${d.code} + ' · ' + ${d.dockType.label}"
+                      th:disabled="${d.dockType != a.dockType}"></option>
+            </select>
+            <button class="btn small" type="submit"
+                    th:disabled="${a.status.name()!='GATED_IN'}">叫号</button>
+          </form>
+        </td>
+      </tr>
+      <tr th:if="${waiting.isEmpty()}"><td colspan="8" class="muted">等候区暂无车辆</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+<script>
+// 已等候分钟数：用浏览器当前时间（展示口径同样以进场时刻起算，精确到分）
+(function () {
+  function render() {
+    document.querySelectorAll('.waiting-min').forEach(function (el) {
+      var since = parseInt(el.getAttribute('data-since'), 10);
+      var mins = Math.max(0, Math.floor((Date.now() - since * 1000) / 60000));
+      el.textContent = mins + ' 分钟';
+    });
+  }
+  render();
+  setInterval(render, 30000);
+})();
+</script>
+</body>
+</html>

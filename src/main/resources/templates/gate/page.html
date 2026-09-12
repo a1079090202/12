@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('门卫进场')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+  <div class="panel" style="max-width:560px;margin-bottom:16px">
+    <h2>门卫办理进场</h2>
+    <form class="stacked" th:action="@{/gate/in}" method="post">
+      <label>预约码</label>
+      <input name="code" required autofocus placeholder="如 YY2609120001" style="text-transform:uppercase">
+      <div style="margin-top:14px"><button class="btn" type="submit">放行进场</button></div>
+    </form>
+    <div th:if="${result != null}" style="margin-top:16px">
+      <div class="flash ok">
+        已放行：<b th:text="${result.appointment.plateNo}"></b>
+        （预约码 <span class="mono" th:text="${result.appointment.code}"></span>）
+      </div>
+      <div th:if="${result.early}" class="flash warn">该车早到，已引导进入等候区。</div>
+      <div th:if="${result.late}" class="flash err">
+        该车迟到 <b th:text="${result.lateMinutes}"></b> 分钟（超过 45 分钟宽限），已标红。
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="panel">
+      <h2>当前在场车辆</h2>
+      <table>
+        <thead><tr><th>车牌</th><th>状态</th><th>月台</th><th>进场</th><th>标记</th></tr></thead>
+        <tbody>
+        <tr th:each="a : ${inYard}">
+          <td class="mono"><a th:href="@{/appointments/{id}(id=${a.id})}" th:text="${a.plateNo}"></a></td>
+          <td><span class="badge info" th:text="${a.status.label}"></span></td>
+          <td th:text="${ref.dockCode(a.assignedDockId)}"></td>
+          <td class="nowrap" th:text="${clock.formatTime(a.arrivedAt)}"></td>
+          <td>
+            <span th:if="${a.lateFlag}" class="badge late">迟到</span>
+            <span th:if="${a.earlyArrival}" class="badge early">早到</span>
+          </td>
+        </tr>
+        <tr th:if="${inYard.isEmpty()}"><td colspan="5" class="muted">场内暂无车辆</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>今日预约</h2>
+      <table>
+        <thead><tr><th>预约码</th><th>车牌</th><th>时段</th><th>状态</th></tr></thead>
+        <tbody>
+        <tr th:each="a : ${todayList}">
+          <td class="mono" th:text="${a.code}"></td>
+          <td class="mono" th:text="${a.plateNo}"></td>
+          <td class="nowrap" th:text="${clock.formatTime(a.slotStart)}"></td>
+          <td><span class="badge gray" th:text="${a.status.label}"></span></td>
+        </tr>
+        <tr th:if="${todayList.isEmpty()}"><td colspan="4" class="muted">今日暂无预约</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>

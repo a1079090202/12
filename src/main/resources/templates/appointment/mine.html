@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('我的预约')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+  <div class="panel">
+    <h2>我的预约
+      <a class="btn small" style="float:right" th:href="@{/appointments/new}">+ 新建预约</a>
+    </h2>
+    <table>
+      <thead><tr>
+        <th>预约码</th><th>订单号</th><th>车牌</th><th>货类</th><th>月台类型</th>
+        <th>预计时段</th><th>状态</th><th>迟到</th><th></th>
+      </tr></thead>
+      <tbody>
+      <tr th:each="a : ${list}">
+        <td class="mono"><a th:href="@{/appointments/{id}(id=${a.id})}" th:text="${a.code}"></a></td>
+        <td th:text="${a.orderNo}"></td>
+        <td class="mono" th:text="${a.plateNo}"></td>
+        <td th:text="${a.cargoType}"></td>
+        <td th:text="${a.dockType.label}"></td>
+        <td class="nowrap" th:text="${clock.formatDateTime(a.slotStart)}"></td>
+        <td><span class="badge info" th:text="${a.status.label}"></span>
+            <span th:if="${a.status.name() == 'OVERRIDDEN'}" class="badge early">插单</span></td>
+        <td>
+          <span th:if="${a.lateFlag}" class="badge late" th:text="'迟到 ' + ${a.lateMinutes} + ' 分'"></span>
+          <span th:if="${a.earlyArrival}" class="badge early">早到</span>
+        </td>
+        <td class="nowrap">
+          <form class="inline" th:if="${a.status.name() == 'BOOKED' || a.status.name() == 'OVERRIDDEN'}"
+                th:action="@{/appointments/{id}/cancel(id=${a.id})}" method="post"
+                onsubmit="return confirm('确认取消该预约？')">
+            <button class="btn secondary small" type="submit">取消</button>
+          </form>
+        </td>
+      </tr>
+      <tr th:if="${list.isEmpty()}"><td colspan="9" class="muted">还没有预约，点右上角新建。</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>

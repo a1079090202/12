@@ -1,0 +1,7 @@
+target/
+.git/
+maven.tar.gz
+mvn.dl.log
+mvn.status
+*.log
+.claude/

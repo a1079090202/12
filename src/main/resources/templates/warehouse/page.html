@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('仓库作业')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+  <div class="panel">
+    <h2>在场车辆作业</h2>
+    <table>
+      <thead><tr>
+        <th>车牌</th><th>货类</th><th>月台</th><th>状态</th>
+        <th>进场</th><th>靠台</th><th>卸货开始</th><th>完成</th><th>操作</th>
+      </tr></thead>
+      <tbody>
+      <tr th:each="a : ${active}">
+        <td class="mono"><a th:href="@{/appointments/{id}(id=${a.id})}" th:text="${a.plateNo}"></a></td>
+        <td th:text="${a.cargoType}"></td>
+        <td th:text="${ref.dockCode(a.assignedDockId)}"></td>
+        <td><span class="badge info" th:text="${a.status.label}"></span></td>
+        <td class="nowrap" th:text="${clock.formatTime(a.arrivedAt)}"></td>
+        <td class="nowrap" th:text="${clock.formatTime(a.dockedAt)}"></td>
+        <td class="nowrap" th:text="${clock.formatTime(a.unloadStartAt)}"></td>
+        <td class="nowrap" th:text="${clock.formatTime(a.completedAt)}"></td>
+        <td class="nowrap">
+          <!-- 已叫号：选择分配给本车的月台靠台 -->
+          <form th:if="${a.status.name()=='CALLED'}" class="inline"
+                th:action="@{/warehouse/{id}/dock(id=${a.id})}" method="post">
+            <input type="hidden" name="dockId" th:value="${a.assignedDockId}">
+            <button class="btn small" type="submit">靠台</button>
+          </form>
+          <form th:if="${a.status.name()=='DOCKED'}" class="inline"
+                th:action="@{/warehouse/{id}/start(id=${a.id})}" method="post">
+            <button class="btn small" type="submit">开始卸货</button>
+          </form>
+          <form th:if="${a.status.name()=='UNLOADING'}" class="inline"
+                th:action="@{/warehouse/{id}/complete(id=${a.id})}" method="post">
+            <button class="btn small" type="submit">卸货完成</button>
+          </form>
+          <form th:if="${a.status.name()=='COMPLETED'}" class="inline"
+                th:action="@{/warehouse/{id}/exit(id=${a.id})}" method="post">
+            <button class="btn small" type="submit">出场并核费</button>
+          </form>
+        </td>
+      </tr>
+      <tr th:if="${active.isEmpty()}"><td colspan="9" class="muted">场内暂无车辆</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>

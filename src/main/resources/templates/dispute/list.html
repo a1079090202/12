@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('异议处理')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+  <div class="panel">
+    <h2>待处理异议</h2>
+    <div class="flash warn">
+      处理异议时，<b>原始核费金额与费率快照不可修改或删除</b>：驳回则维持原金额；成立可给出调整金额，
+      系统同时保留原金额与调整金额。
+    </div>
+    <table>
+      <thead><tr>
+        <th>异议#</th><th>承运商</th><th>车牌</th><th>提出时间</th><th>异议原因</th>
+        <th>原始金额</th><th>处理</th>
+      </tr></thead>
+      <tbody>
+      <tr th:each="d : ${open}">
+        <td th:text="${d.id}"></td>
+        <td th:text="${ref.carrierName(d.carrierId)}"></td>
+        <td class="mono">
+          <a th:href="@{/appointments/{id}(id=${d.appointmentId})}">查看单</a>
+        </td>
+        <td class="nowrap" th:text="${clock.formatDateTime(d.raisedAt)}"></td>
+        <td th:text="${d.reason}"></td>
+        <td th:text="${#numbers.formatDecimal(d.originalAmount,1,2)} + ' 元'"></td>
+        <td style="min-width:320px">
+          <form class="inline" th:action="@{/disputes/{id}/adjust(id=${d.id})}" method="post"
+                style="display:flex;gap:6px;margin-bottom:6px">
+            <input name="adjustedAmount" type="number" step="0.01" min="0" required
+                   placeholder="调整后金额" style="width:120px;padding:4px 8px">
+            <input name="note" placeholder="调整说明（可选）" style="flex:1;padding:4px 8px">
+            <button class="btn small" type="submit">成立并调整</button>
+          </form>
+          <form class="inline" th:action="@{/disputes/{id}/reject(id=${d.id})}" method="post"
+                style="display:flex;gap:6px">
+            <input name="note" placeholder="驳回理由（可选）" style="flex:1;padding:4px 8px">
+            <button class="btn small danger" type="submit">驳回（维持原价）</button>
+          </form>
+        </td>
+      </tr>
+      <tr th:if="${open.isEmpty()}"><td colspan="7" class="muted">暂无待处理异议</td></tr>
+      </tbody>
+    </table>
+  </div>
+</div>
+</body>
+</html>

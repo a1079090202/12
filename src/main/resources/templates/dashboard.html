@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org"
+      xmlns:sec="http://www.thymeleaf.org/extras/spring-security">
+<head th:replace="~{fragments/layout :: head('首页看板')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+
+<div class="container">
+  <div class="panel" style="margin-bottom:16px">
+    <div style="display:flex;align-items:center;gap:14px;flex-wrap:wrap">
+      <h2 style="margin:0">月台现状 · <span th:text="${#temporals.format(view.date,'yyyy-MM-dd')}"></span></h2>
+      <span class="muted" id="clock"></span>
+      <span class="spacer" style="flex:1"></span>
+      <a class="btn secondary small" th:href="@{/fees/download}">⬇ 下载当天核费明细 CSV</a>
+      <button class="btn secondary small" id="refreshBtn" type="button">刷新</button>
+    </div>
+
+    <div class="docks" style="margin-top:14px">
+      <div class="dock-card" th:each="ds : ${view.dockStatuses}"
+           th:classappend="${ds.appt != null} ? 'busy' : 'free'">
+        <div class="dock-code" th:text="${ds.dock.code}">D1</div>
+        <div class="dock-type" th:text="${ds.dock.dockType.label}">普通月台</div>
+        <span class="badge" th:classappend="${ds.appt != null} ? 'busy' : 'free'"
+              th:text="${ds.phase}">空闲</span>
+        <div th:if="${ds.appt != null}" style="margin-top:8px;font-size:13px">
+          <div class="mono" th:text="${ds.appt.plateNo}">沪A1234</div>
+          <div class="muted" th:text="${#strings.abbreviate(ds.appt.cargoType,12)}">货类</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid grid-3" style="margin-bottom:16px">
+    <div class="panel">
+      <div class="kpi" th:text="${view.avgTurnText}">0 分钟</div>
+      <div class="kpi-label">今日平均周转时间（进场→出场，<span th:text="${view.turnedCount}">0</span> 车）</div>
+    </div>
+    <div class="panel">
+      <div class="kpi" th:text="${view.waiting.size()}">0</div>
+      <div class="kpi-label">等待 / 已派台车辆数</div>
+    </div>
+    <div class="panel">
+      <div class="kpi" th:text="${#numbers.formatDecimal(view.todayFeeTotal,1,2)} + ' 元'">0 元</div>
+      <div class="kpi-label">今日核费最终金额合计（<span th:text="${view.todayFees.size()}">0</span> 单）</div>
+    </div>
+  </div>
+
+  <div class="grid grid-2">
+    <div class="panel">
+      <h2>等待车辆（按进场先后）</h2>
+      <table>
+        <thead><tr><th>序</th><th>车牌</th><th>货类</th><th>月台类型</th><th>进场</th><th>标记</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="a, it : ${view.waiting}">
+          <td th:text="${it.count}">1</td>
+          <td class="mono"><a th:href="@{/appointments/{id}(id=${a.id})}" th:text="${a.plateNo}"></a></td>
+          <td th:text="${a.cargoType}"></td>
+          <td th:text="${a.dockType.label}"></td>
+          <td class="nowrap" th:text="${clock.formatTime(a.arrivedAt)}"></td>
+          <td>
+            <span th:if="${a.earlyArrival}" class="badge early">早到等候</span>
+            <span th:if="${a.lateFlag}" class="badge late">迟到 <span th:text="${a.lateMinutes}"></span> 分</span>
+          </td>
+          <td sec:authorize="hasRole('DISPATCHER')">
+            <form class="inline" th:action="@{/dispatch/call}" method="post">
+              <input type="hidden" name="apptId" th:value="${a.id}">
+              <button class="btn small" type="submit">叫号（自动派台）</button>
+            </form>
+          </td>
+        </tr>
+        <tr th:if="${view.waiting.isEmpty()}"><td colspan="7" class="muted">暂无等待车辆</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <h2>今日核费明细（页面口径，与下载 CSV 一致）</h2>
+      <table>
+        <thead><tr><th>车牌</th><th>等待(分)</th><th>计费(分)</th><th>原始金额</th><th>最终金额</th><th>状态</th></tr></thead>
+        <tbody>
+        <tr th:each="f : ${view.todayFees}">
+          <td class="mono" th:text="${f.plateNo}"></td>
+          <td th:text="${f.waitMinutes}"></td>
+          <td th:text="${f.chargeableMinutes}"></td>
+          <td th:text="${#numbers.formatDecimal(f.originalAmount,1,2)}"></td>
+          <td th:text="${#numbers.formatDecimal(f.finalAmount,1,2)}"></td>
+          <td><span class="badge info" th:text="${f.status}"></span></td>
+        </tr>
+        <tr th:if="${view.todayFees.isEmpty()}"><td colspan="6" class="muted">今日尚无出场核费车辆</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script th:src="@{/js/dashboard.js}"></script>
+</body>
+</html>
