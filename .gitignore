@@ -4,4 +4,3 @@ target/
 .vscode/
 *.iml
 .mvn/wrapper/maven-wrapper.jar
-.env

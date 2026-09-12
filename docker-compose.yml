@@ -3,18 +3,17 @@ services:
     image: postgres:16-alpine
     environment:
       POSTGRES_DB: dockyard
-      POSTGRES_USER: ${DB_USER:?请在 .env 中设置 DB_USER}
-      # 无默认弱口令：.env 缺失或未设置时 compose 直接拒绝启动
-      POSTGRES_PASSWORD: ${DB_PASSWORD:?请在 .env 中设置强数据库口令 DB_PASSWORD}
-    # 不发布 5432 端口：数据库仅在 compose 内部网络可达，宿主机/外网不可直连
+      POSTGRES_USER: dockyard
+      POSTGRES_PASSWORD: dockyard
+    ports:
+      - "5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d dockyard"]
+      test: ["CMD-SHELL", "pg_isready -U dockyard"]
       interval: 5s
       timeout: 3s
       retries: 20
-    restart: unless-stopped
 
   app:
     build: .
@@ -23,35 +22,12 @@ services:
         condition: service_healthy
     environment:
       DB_URL: jdbc:postgresql://db:5432/dockyard
-      DB_USER: ${DB_USER:?请在 .env 中设置 DB_USER}
-      DB_PASSWORD: ${DB_PASSWORD:?请在 .env 中设置强数据库口令 DB_PASSWORD}
-      # 首次部署（空库）必须提供，用于创建首个调度管理员；之后可从环境中移除
-      ADMIN_USERNAME: ${ADMIN_USERNAME:?请在 .env 中设置 ADMIN_USERNAME}
-      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?请在 .env 中设置至少 8 位的 ADMIN_PASSWORD}
-      SEED_SAMPLE: "false"
-      SEED_DEMO_ACCOUNTS: "false"
+      DB_USER: dockyard
+      DB_PASSWORD: dockyard
+      SEED_SAMPLE: "true"
       TZ: Asia/Shanghai
-      JAVA_OPTS: "-XX:MaxRAMPercentage=75.0"
     ports:
-      - "127.0.0.1:8080:8080"   # 仅绑定宿主机回环地址；对外暴露请前置 TLS 反向代理
-    # 最小权限：只读根文件系统、丢弃所有 Linux capabilities、禁止提权
-    read_only: true
-    tmpfs:
-      - /tmp:size=64m
-    cap_drop:
-      - ALL
-    security_opt:
-      - no-new-privileges:true
-    pids_limit: 200
-    mem_limit: 512m
-    healthcheck:
-      # temurin jammy 自带 bash，用 /dev/tcp 探测端口，无需额外安装 curl/wget
-      test: ["CMD-SHELL", "bash -c 'exec 3<>/dev/tcp/127.0.0.1/8080' || exit 1"]
-      interval: 15s
-      timeout: 3s
-      retries: 5
-      start_period: 40s
-    restart: unless-stopped
+      - "8080:8080"
 
 volumes:
   pgdata:

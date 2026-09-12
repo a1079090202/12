@@ -30,7 +30,7 @@
         <td class="nowrap">
           <form class="inline" th:if="${a.status.name() == 'BOOKED' || a.status.name() == 'OVERRIDDEN'}"
                 th:action="@{/appointments/{id}/cancel(id=${a.id})}" method="post"
-                data-confirm="确认取消该预约？">
+                onsubmit="return confirm('确认取消该预约？')">
             <button class="btn secondary small" type="submit">取消</button>
           </form>
         </td>

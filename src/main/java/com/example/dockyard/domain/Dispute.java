@@ -39,7 +39,7 @@ public class Dispute {
     private Long raisedBy;
 
     @Column(name = "raised_at", nullable = false)
-    private Instant raisedAt;
+    private Instant raisedAt = Instant.now();
 
     @Column(name = "resolved_by")
     private Long resolvedBy;
@@ -65,7 +65,6 @@ public class Dispute {
     public Long getRaisedBy() { return raisedBy; }
     public void setRaisedBy(Long raisedBy) { this.raisedBy = raisedBy; }
     public Instant getRaisedAt() { return raisedAt; }
-    public void setRaisedAt(Instant raisedAt) { this.raisedAt = raisedAt; }
     public Long getResolvedBy() { return resolvedBy; }
     public void setResolvedBy(Long resolvedBy) { this.resolvedBy = resolvedBy; }
     public Instant getResolvedAt() { return resolvedAt; }

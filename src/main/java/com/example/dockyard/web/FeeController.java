@@ -93,35 +93,12 @@ public class FeeController {
                 + "\n";
     }
 
-    /**
-     * CSV 单元格转义：
-     *  1) 公式注入中和——去掉前导空白后若以 = + - @ Tab CR 开头，前置单引号，
-     *     防止 Excel/WPS 把用户可控字段（订单号/车牌/货物等）当公式执行；
-     *  2) 标准 CSV 引号包裹。
-     */
     private String csv(String v) {
         if (v == null) {
             return "";
         }
-        String value = neutralizeFormula(v);
-        if (value.contains(",") || value.contains("\"") || value.contains("\n") || value.contains("\r")) {
-            return "\"" + value.replace("\"", "\"\"") + "\"";
-        }
-        return value;
-    }
-
-    /** 前缀空白后仍以公式触发字符开头时，加单引号强制按文本处理（Excel 官方推荐做法） */
-    private String neutralizeFormula(String v) {
-        int i = 0;
-        while (i < v.length() && Character.isWhitespace(v.charAt(i))) {
-            i++;
-        }
-        if (i < v.length()) {
-            char c = v.charAt(i);
-            if (c == '=' || c == '+' || c == '-' || c == '@'
-                    || c == '\t' || c == '\r') {
-                return "'" + v;
-            }
+        if (v.contains(",") || v.contains("\"") || v.contains("\n")) {
+            return "\"" + v.replace("\"", "\"\"") + "\"";
         }
         return v;
     }

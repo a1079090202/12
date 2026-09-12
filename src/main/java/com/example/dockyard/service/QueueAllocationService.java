@@ -7,7 +7,6 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.time.Instant;
 import java.util.List;
 
 /**
@@ -62,9 +61,7 @@ public class QueueAllocationService {
         }
 
         appt.setAssignedDockId(dock.getId());
-        Instant now = clock.now();
-        appt.setCalledAt(now);
-        appt.setUpdatedAt(now);
+        appt.setCalledAt(clock.now());
         appt.setStatus(AppointmentStatus.CALLED);
         appointments.save(appt);
         events.record(appt.getId(), EventType.CALL, actorId, dock.getId(),

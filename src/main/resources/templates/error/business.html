@@ -8,7 +8,7 @@
     <h2>无法完成该操作</h2>
     <div class="flash err" th:text="${message}">业务规则不允许</div>
     <p class="muted">请核对车辆状态 / 预约码 / 月台占用情况后重试，或联系调度员。原始记录不会被删除。</p>
-    <a class="btn secondary" href="#" data-history-back>返回上一页</a>
+    <a class="btn secondary" href="javascript:history.back()">返回上一页</a>
     <a class="btn" th:href="@{/}">回首页</a>
   </div>
 </div>

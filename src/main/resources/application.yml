@@ -1,22 +1,13 @@
 server:
   port: 8080
-  # 置于反向代理后时正确识别 X-Forwarded-*（协议/地址）
-  forward-headers-strategy: framework
-  error:
-    include-stacktrace: never
-    include-message: never
-    include-binding-errors: never
-    whitelabel:
-      enabled: false
 
 spring:
   application:
     name: dockyard
   datasource:
-    # 无内置默认口令：必须通过环境变量提供（见 .env.example / docker-compose.yml）
-    url: ${DB_URL}
-    username: ${DB_USER}
-    password: ${DB_PASSWORD}
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/dockyard}
+    username: ${DB_USER:dockyard}
+    password: ${DB_PASSWORD:dockyard}
     hikari:
       maximum-pool-size: 20
   jpa:
@@ -30,6 +21,8 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration
+  thymeleaf:
+    cache: false
 
 app:
   timezone: Asia/Shanghai
@@ -39,10 +32,4 @@ app:
   fee:
     free-minutes: 90     # 免费等候时长（分钟）
   seed:
-    # 生产默认不播种任何演示数据/账号；本地开发用 dev profile（application-dev.yml）覆盖为 true
-    sample: ${SEED_SAMPLE:false}
-    demo-accounts: ${SEED_DEMO_ACCOUNTS:false}
-  bootstrap:
-    # 生产首管理员引导：空库时若两者都提供则创建一个 DISPATCHER 账号（密码 BCrypt 加密入库）
-    admin-username: ${ADMIN_USERNAME:}
-    admin-password: ${ADMIN_PASSWORD:}
+    sample: ${SEED_SAMPLE:true}   # 启动时若库为空则写入初始化账号以外的 20 条样例预约

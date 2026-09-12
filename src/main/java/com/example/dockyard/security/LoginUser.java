@@ -13,16 +13,9 @@ import java.util.List;
 public class LoginUser implements UserDetails {
 
     private final AppUser user;
-    private final boolean accountLocked;
 
     public LoginUser(AppUser user) {
-        this(user, false);
-    }
-
-    /** accountLocked 由 LoginLockService 的失败计数决定（区别于数据库里的停用标记） */
-    public LoginUser(AppUser user, boolean accountLocked) {
         this.user = user;
-        this.accountLocked = accountLocked;
     }
 
     public Long getId() { return user.getId(); }
@@ -45,7 +38,7 @@ public class LoginUser implements UserDetails {
     public boolean isAccountNonExpired() { return true; }
 
     @Override
-    public boolean isAccountNonLocked() { return !accountLocked; }
+    public boolean isAccountNonLocked() { return true; }
 
     @Override
     public boolean isCredentialsNonExpired() { return true; }
