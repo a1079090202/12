@@ -4,9 +4,11 @@ services:
     environment:
       POSTGRES_DB: dockyard
       POSTGRES_USER: dockyard
-      POSTGRES_PASSWORD: dockyard
-    ports:
-      - "5432:5432"
+      # 必填：从 .env / 宿主环境注入，仓库内不再提供默认弱口令
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?请在 .env 中设置 DB_PASSWORD}
+    # 不映射宿主端口：数据库只在内部网络可达，不对公网/宿主暴露
+    expose:
+      - "5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -14,6 +16,8 @@ services:
       interval: 5s
       timeout: 3s
       retries: 20
+    networks:
+      - internal
 
   app:
     build: .
@@ -23,11 +27,21 @@ services:
     environment:
       DB_URL: jdbc:postgresql://db:5432/dockyard
       DB_USER: dockyard
-      DB_PASSWORD: dockyard
-      SEED_SAMPLE: "true"
+      DB_PASSWORD: ${DB_PASSWORD:?请在 .env 中设置 DB_PASSWORD}
+      # 初始账号密码：不设置则启动时随机生成（见启动日志，仅打印一次）
+      INIT_PASSWORD: ${INIT_PASSWORD:-}
+      # 演示用样例数据默认关闭；本地体验时在 .env 置 true
+      SEED_SAMPLE: ${SEED_SAMPLE:-false}
+      # 置于 HTTPS 反向代理后时置 true（给会话 Cookie 加 Secure）
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
       TZ: Asia/Shanghai
     ports:
       - "8080:8080"
+    networks:
+      - internal
+
+networks:
+  internal:
 
 volumes:
   pgdata:

@@ -5,8 +5,11 @@ import com.example.dockyard.security.CurrentUser;
 import com.example.dockyard.service.GateService;
 import com.example.dockyard.service.ReferenceData;
 import com.example.dockyard.service.YardClock;
+import com.example.dockyard.web.form.GateInForm;
+import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 /** 门卫：输入预约码办理进场，看到在场车辆与今日预约。 */
@@ -39,8 +42,11 @@ public class GateController {
     }
 
     @PostMapping("/in")
-    public String gateIn(@RequestParam String code, Model model) {
-        var result = gate.gateIn(code, CurrentUser.id());
+    public String gateIn(@Valid @ModelAttribute GateInForm form, BindingResult br, Model model) {
+        if (br.hasErrors()) {
+            throw new com.example.dockyard.service.BusinessRuleException(WebForms.firstError(br));
+        }
+        var result = gate.gateIn(form.getCode(), CurrentUser.id());
         model.addAttribute("result", result);
         return page(model);
     }

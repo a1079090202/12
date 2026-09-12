@@ -2,9 +2,9 @@ package com.example.dockyard.bootstrap;
 
 import com.example.dockyard.domain.*;
 import com.example.dockyard.repo.*;
+import com.example.dockyard.service.AppointmentCodeGenerator;
 import com.example.dockyard.service.FeeService;
 import com.example.dockyard.service.YardClock;
-import jakarta.persistence.EntityManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,15 +21,14 @@ import java.time.LocalDate;
  * 启动初始化（库为空时执行，可重复启动不重复造数）：
  *  - 4 类角色账号；2 家承运商；6 个月台；
  *  - 两家承运商今/明两日费率（跨费率日期演示用）；
- *  - 20 条今日样例预约：16 条已预约、1 条等候中、1 条卸货中、
- *    1 条已出场（含核费单，可直接对账/提异议），另 1 条已插单。
- * 初始密码统一 dock1234，见 README。
+ *  - 20 条今日样例预约（SEED_SAMPLE=true 时）。
+ * 初始密码取 app.init.password（环境变量 INIT_PASSWORD）；未配置则随机生成，
+ * 仅在启动日志中明文打印一次；生产请通过 INIT_PASSWORD 注入并在首次登录后改密。
  */
 @Component
 public class DataInitializer implements CommandLineRunner {
 
     private static final Logger log = LoggerFactory.getLogger(DataInitializer.class);
-    private static final String INIT_PASSWORD = "dock1234";
 
     private final AppUserRepository users;
     private final CarrierRepository carriers;
@@ -39,15 +38,24 @@ public class DataInitializer implements CommandLineRunner {
     private final FeeService feeService;
     private final PasswordEncoder encoder;
     private final YardClock clock;
-    private final EntityManager em;
+    private final AppointmentCodeGenerator codeGenerator;
 
-    @Value("${app.seed.sample:true}")
+    @Value("${app.seed.sample:false}")
     private boolean seedSample;
+
+    /** 槽长必须与运行期 app.slot.length-minutes 一致，否则样例单的 slot_end 与运行期切槽口径分叉 */
+    @Value("${app.slot.length-minutes:30}")
+    private int slotMinutes;
+
+    /** 初始账号密码；留空则随机生成 */
+    @Value("${app.init.password:}")
+    private String configuredInitPassword;
 
     public DataInitializer(AppUserRepository users, CarrierRepository carriers,
                            CarrierDailyRateRepository rates, DockRepository docks,
                            AppointmentRepository appointments, FeeService feeService,
-                           PasswordEncoder encoder, YardClock clock, EntityManager em) {
+                           PasswordEncoder encoder, YardClock clock,
+                           AppointmentCodeGenerator codeGenerator) {
         this.users = users;
         this.carriers = carriers;
         this.rates = rates;
@@ -56,7 +64,7 @@ public class DataInitializer implements CommandLineRunner {
         this.feeService = feeService;
         this.encoder = encoder;
         this.clock = clock;
-        this.em = em;
+        this.codeGenerator = codeGenerator;
     }
 
     @Override
@@ -69,11 +77,14 @@ public class DataInitializer implements CommandLineRunner {
         Carrier c1 = carrier("SD", "顺达物流");
         Carrier c2 = carrier("LX", "冷鲜运输");
 
-        // 费率：今日 60 / 次日 90（C1）；今日 80 / 次日 100（C2）——用于跨费率日期分段
+        // 费率：今/明两日不同价用于跨费率日期分段演示；再往后 12 天沿用次日价，
+        // 避免严格核费（缺费率拒绝出场）后，演示环境第 3 天起所有出场被拦
         rate(c1, clock.today(), "60.00");
-        rate(c1, clock.today().plusDays(1), "90.00");
         rate(c2, clock.today(), "80.00");
-        rate(c2, clock.today().plusDays(1), "100.00");
+        for (int offset = 1; offset <= 13; offset++) {
+            rate(c1, clock.today().plusDays(offset), "90.00");
+            rate(c2, clock.today().plusDays(offset), "100.00");
+        }
 
         dock("D1", "1号月台", DockType.STANDARD);
         dock("D2", "2号月台", DockType.STANDARD);
@@ -83,13 +94,15 @@ public class DataInitializer implements CommandLineRunner {
         dock("D6", "6号大件月台", DockType.OVERSIZE);
 
         Long c1Id = c1.getId(), c2Id = c2.getId();
-        user("carrier1", "顺达-调度联系人", Role.CARRIER, c1Id);
-        user("carrier2", "冷鲜-调度联系人", Role.CARRIER, c2Id);
-        Long guardId = user("guard", "门卫老王", Role.GUARD, null);
-        Long whId = user("warehouse", "仓管小李", Role.WAREHOUSE, null);
-        Long dispId = user("dispatcher", "调度老赵", Role.DISPATCHER, null);
+        String initPassword = resolveInitPassword();
+        user("carrier1", "顺达-调度联系人", Role.CARRIER, c1Id, initPassword);
+        user("carrier2", "冷鲜-调度联系人", Role.CARRIER, c2Id, initPassword);
+        Long guardId = user("guard", "门卫老王", Role.GUARD, null, initPassword);
+        Long whId = user("warehouse", "仓管小李", Role.WAREHOUSE, null, initPassword);
+        Long dispId = user("dispatcher", "调度老赵", Role.DISPATCHER, null, initPassword);
 
-        log.info("初始化账号完成，初始密码均为 {}", INIT_PASSWORD);
+        // 密码是否已打印由 resolveInitPassword() 决定，这里不再明文输出
+        log.info("初始化账号完成：carrier1/carrier2/guard/warehouse/dispatcher 共 5 个账号");
 
         if (seedSample && appointments.count() == 0) {
             seedAppointments(c1Id, c2Id, guardId, whId, dispId);
@@ -113,7 +126,7 @@ public class DataInitializer implements CommandLineRunner {
             if (i == 11) {
                 type = DockType.OVERSIZE;
             }
-            Instant start = clock.truncateToSlot(clock.parseDateTime(today, times[i]), 30);
+            Instant start = clock.truncateToSlot(clock.parseDateTime(today, times[i]), slotMinutes);
             saveBooked(carrierId, "SO-" + today.toString().replace("-", "") + "-" + (i + 1),
                     "沪A" + String.format("%04d", 1001 + i), "司机" + (i + 1),
                     type == DockType.COLD ? cargoCold[i % 2] : cargoStd[i % 4],
@@ -121,21 +134,21 @@ public class DataInitializer implements CommandLineRunner {
         }
 
         // 1 条插单（08:30 槽，写原因）
-        Instant overSlot = clock.truncateToSlot(clock.parseDateTime(today, "08:30"), 30);
+        Instant overSlot = clock.truncateToSlot(clock.parseDateTime(today, "08:30"), slotMinutes);
         Appointment over = saveBooked(c1, "SO-URGENT-01", "沪B09001", "加急司机",
                 "加急电子配件", DockType.STANDARD, overSlot,
                 AppointmentStatus.OVERRIDDEN, "客户产线停工待料，调度插单", dispId);
 
         // 1 条已进场在等候（20 分钟前到）
         Instant arrived = clock.now().minusSeconds(20 * 60);
-        Instant waitSlot = clock.truncateToSlot(arrived, 30);
+        Instant waitSlot = clock.truncateToSlot(arrived, slotMinutes);
         Appointment waiting = saveBooked(c1, "SO-WAIT-01", "沪A00021", "等候司机",
                 "日化百货", DockType.STANDARD, waitSlot, AppointmentStatus.GATED_IN, null, null);
         waiting.setArrivedAt(arrived);
         appointments.save(waiting);
 
         // 1 条卸货中（占用 D1）
-        Instant unloadSlot = clock.truncateToSlot(clock.parseDateTime(today, "07:00"), 30);
+        Instant unloadSlot = clock.truncateToSlot(clock.parseDateTime(today, "07:00"), slotMinutes);
         Appointment unloading = saveBooked(c1, "SO-LIVE-01", "沪A00022", "作业司机",
                 "常温食品", DockType.STANDARD, unloadSlot, AppointmentStatus.UNLOADING, null, null);
         unloading.setAssignedDockId(docks.findByActiveTrueOrderByCode().get(0).getId());
@@ -147,7 +160,7 @@ public class DataInitializer implements CommandLineRunner {
         appointments.save(unloading);
 
         // 1 条已出场：等待 150 分钟，免费 90，计费 60 分钟（今日费率 60 元/时 -> 60.00 元）
-        Instant exitSlot = clock.truncateToSlot(clock.parseDateTime(today, "06:30"), 30);
+        Instant exitSlot = clock.truncateToSlot(clock.parseDateTime(today, "06:30"), slotMinutes);
         Appointment exited = saveBooked(c1, "SO-DONE-01", "沪A00023", "离场司机",
                 "服装", DockType.STANDARD, exitSlot, AppointmentStatus.EXITED, null, null);
         exited.setArrivedAt(clock.parseDateTime(today, "09:00"));
@@ -166,7 +179,7 @@ public class DataInitializer implements CommandLineRunner {
                                    String cargo, DockType type, Instant slotStart,
                                    AppointmentStatus status, String overrideReason, Long overrideBy) {
         Appointment a = new Appointment();
-        a.setCode(nextCode());
+        a.setCode(codeGenerator.next(slotStart));
         a.setCarrierId(carrierId);
         a.setOrderNo(orderNo);
         a.setPlateNo(plate);
@@ -174,7 +187,7 @@ public class DataInitializer implements CommandLineRunner {
         a.setCargoType(cargo);
         a.setDockType(type);
         a.setSlotStart(slotStart);
-        a.setSlotEnd(slotStart.plusSeconds(30 * 60));
+        a.setSlotEnd(slotStart.plusSeconds(slotMinutes * 60L));
         a.setStatus(status);
         a.setOverrideReason(overrideReason);
         a.setOverriddenBy(overrideBy);
@@ -205,20 +218,39 @@ public class DataInitializer implements CommandLineRunner {
         docks.save(d);
     }
 
-    private Long user(String username, String displayName, Role role, Long carrierId) {
+    private Long user(String username, String displayName, Role role, Long carrierId, String password) {
         AppUser u = new AppUser();
         u.setUsername(username);
         u.setDisplayName(displayName);
         u.setRole(role);
         u.setCarrierId(carrierId);
-        u.setPasswordHash(encoder.encode(INIT_PASSWORD));
+        u.setPasswordHash(encoder.encode(password));
         return users.save(u).getId();
     }
 
-    private String nextCode() {
-        Long seq = ((Number) em.createNativeQuery("select nextval('appt_code_seq')")
-                .getSingleResult()).longValue();
-        String dayPart = clock.today().format(java.time.format.DateTimeFormatter.ofPattern("yyMMdd"));
-        return "YY" + dayPart + String.format("%04d", seq % 10000);
+    /**
+     * 初始密码：优先使用 INIT_PASSWORD / app.init.password；
+     * 未配置则随机生成（字母+数字 20 位）。只在首次初始化时于日志打印一次。
+     */
+    private String resolveInitPassword() {
+        if (configuredInitPassword != null && !configuredInitPassword.isBlank()) {
+            String pwd = configuredInitPassword.strip();
+            log.info("初始化账号完成，使用 INIT_PASSWORD 配置的初始密码（请在首次登录后修改）");
+            return pwd;
+        }
+        String pwd = randomPassword();
+        log.info("初始化账号完成，已为 5 个初始账号生成随机初始密码（仅显示一次）：{}", pwd);
+        log.info("请立即用上述密码登录并修改；也可通过环境变量 INIT_PASSWORD 显式指定初始密码");
+        return pwd;
+    }
+
+    private static String randomPassword() {
+        String alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
+        java.security.SecureRandom rnd = new java.security.SecureRandom();
+        StringBuilder sb = new StringBuilder(20);
+        for (int i = 0; i < 20; i++) {
+            sb.append(alphabet.charAt(rnd.nextInt(alphabet.length())));
+        }
+        return sb.toString();
     }
 }

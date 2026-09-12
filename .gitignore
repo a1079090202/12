@@ -4,3 +4,6 @@ target/
 .vscode/
 *.iml
 .mvn/wrapper/maven-wrapper.jar
+
+# 本地密钥/环境配置，勿提交
+.env

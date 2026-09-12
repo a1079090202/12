@@ -44,6 +44,14 @@ public abstract class AbstractIntegrationTest {
         registry.add("spring.datasource.username", () -> "postgres");
         registry.add("spring.datasource.password", () -> "postgres");
         registry.add("app.seed.sample", () -> "true");
+        // 测试固定使用该初始密码（生产默认随机生成）
+        registry.add("app.init.password", () -> "dock1234");
+        // 显式钉住用例依赖的业务规则参数：application.yml 默认值日后调整不会
+        // 悄悄改变测试口径（容量 6、槽长 30 分钟、免费 90 分钟、迟到宽限 45 分钟）。
+        registry.add("app.slot.capacity", () -> "6");
+        registry.add("app.slot.length-minutes", () -> "30");
+        registry.add("app.fee.free-minutes", () -> "90");
+        registry.add("app.gate.late-tolerance-minutes", () -> "45");
     }
 
     @Autowired protected AppUserRepository userRepository;

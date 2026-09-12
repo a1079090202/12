@@ -31,6 +31,10 @@ public class FeeSettlement {
     @Column(name = "chargeable_minutes", nullable = false)
     private int chargeableMinutes;
 
+    /**
+     * 首个计费段（起算点所在日）的费率快照，仅便于快速对账；
+     * 跨日单完整单价以 fee_segment 各段为准；免费时长内的单该值为 0。
+     */
     @Column(name = "rate_snapshot", nullable = false, precision = 12, scale = 2)
     private BigDecimal rateSnapshot;
 
@@ -52,8 +56,16 @@ public class FeeSettlement {
     @Column(name = "generated_by")
     private Long generatedBy;
 
-    @Column(name = "generated_at", nullable = false)
-    private Instant generatedAt = Instant.now();
+    @Column(name = "generated_at", nullable = false, updatable = false)
+    private Instant generatedAt;
+
+    /** 落库时刻取统一业务时钟（含测试冻结时钟），不直接用 JVM 墙钟 */
+    @PrePersist
+    void prePersist() {
+        if (generatedAt == null) {
+            generatedAt = BusinessTime.now();
+        }
+    }
 
     public Long getId() { return id; }
     public Long getAppointmentId() { return appointmentId; }

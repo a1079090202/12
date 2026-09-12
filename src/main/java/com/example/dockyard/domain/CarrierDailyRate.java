@@ -25,8 +25,15 @@ public class CarrierDailyRate {
     @Column(name = "created_by")
     private Long createdBy;
 
-    @Column(name = "created_at", nullable = false)
-    private Instant createdAt = Instant.now();
+    @Column(name = "created_at", nullable = false, updatable = false)
+    private Instant createdAt;
+
+    @PrePersist
+    void prePersist() {
+        if (createdAt == null) {
+            createdAt = BusinessTime.now();
+        }
+    }
 
     public Long getId() { return id; }
     public Long getCarrierId() { return carrierId; }

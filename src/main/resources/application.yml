@@ -1,5 +1,15 @@
 server:
   port: 8080
+  # 置于 Nginx/负载均衡等反向代理（TLS 终止）后时按转发头还原协议/地址
+  forward-headers-strategy: native
+  servlet:
+    session:
+      timeout: 30m
+      cookie:
+        http-only: true
+        same-site: lax
+        # 生产经 HTTPS 访问时设 COOKIE_SECURE=true
+        secure: ${COOKIE_SECURE:false}
 
 spring:
   application:
@@ -7,7 +17,8 @@ spring:
   datasource:
     url: ${DB_URL:jdbc:postgresql://localhost:5432/dockyard}
     username: ${DB_USER:dockyard}
-    password: ${DB_PASSWORD:dockyard}
+    # 不提供默认口令：未显式注入 DB_PASSWORD 时拒绝启动（避免弱口令上线）
+    password: ${DB_PASSWORD}
     hikari:
       maximum-pool-size: 20
   jpa:
@@ -17,19 +28,29 @@ spring:
     properties:
       hibernate:
         jdbc:
+          # 固定上海而非 JVM 默认时区：timestamptz 存 UTC 绝对时刻，Instant 绑定不受影响；
+          # rate_date/segment_date 等 date 列是“无时区日历日”，需要在上海会话口径下解释，
+          # 避免容器 TZ 变化时跨午夜日期偏移。业务口径唯一时钟仍是 YardClock（Asia/Shanghai）。
           time_zone: Asia/Shanghai
   flyway:
     enabled: true
     locations: classpath:db/migration
   thymeleaf:
-    cache: false
+    # 使用默认缓存（true）；开发热重载可用 -Dspring-boot.run.arguments=--spring.thymeleaf.cache=false
+    cache: true
 
 app:
-  timezone: Asia/Shanghai
+  # 业务时区固定 Asia/Shanghai，由 YardClock 统一实现；刻意不作为配置项，
+  # 避免“配置一套、代码一套”两套口径分叉（历史上 app.timezone 就是无人读取的死配置）。
+  # 初始化账号密码：留空则首次启动随机生成并在日志中只打印一次
+  init:
+    password: ${INIT_PASSWORD:}
   slot:
     length-minutes: 30
     capacity: 6          # 每个 30 分钟时段最多预约车辆数（6 个月台）
+  gate:
+    late-tolerance-minutes: 45   # 晚于时段终点超过该宽限标记迟到（边界值不算迟到）
   fee:
-    free-minutes: 90     # 免费等候时长（分钟）
+    free-minutes: 90     # 免费等候时长（分钟）。当日费率必须显式配置，缺失即拒绝核费，无兜底单价
   seed:
-    sample: ${SEED_SAMPLE:true}   # 启动时若库为空则写入初始化账号以外的 20 条样例预约
+    sample: ${SEED_SAMPLE:false}  # 仅本地演示：启动时库为空则写入 20 条样例预约

@@ -22,7 +22,28 @@
       "Bash(export *)",
       "Bash(awk '{print $2, $11, $12, $13}')",
       "Bash(/tmp/embedded-pg/PG-1a75b2fdb57c5cfc8674f29ebb0d831b/bin/pg_ctl -D /tmp/pgdata-smoke -m fast stop)",
-      "Bash(awk '{print $2,$11,$12,$13}')"
+      "Bash(awk '{print $2,$11,$12,$13}')",
+      "Bash(grep *)",
+      "Bash(git -C /workspace show 57f2609 --stat)",
+      "Bash(git -C /workspace show ca5d60d --stat)",
+      "Bash(git *)",
+      "Read(//usr/local/**)",
+      "Bash(find / -maxdepth 3 -name \"mvn\" -type f)",
+      "Read(//home/node/.m2/**)",
+      "Bash(find / -maxdepth 2 -name \"*maven*\" -o -maxdepth 2 -name \"*jdk*\" -o -maxdepth 2 -name \"*java*\")",
+      "Bash(tar tzf *)",
+      "Bash(JAVA_HOME=/home/node/tools/jdk-21.0.12.1+1 /home/node/tools/apache-maven-3.9.9/bin/mvn -q -o test)",
+      "Bash(read f *)",
+      "Bash(JAVA_HOME=/home/node/tools/jdk-21.0.12.1+1 /home/node/tools/apache-maven-3.9.9/bin/mvn -q -o compile)",
+      "Bash(echo \"EXIT=$?\")",
+      "Bash(echo \"COMPILE_EXIT=$?\")",
+      "Bash(echo \"TEST_EXIT=$?\")",
+      "Bash(kill 9672 9671 9534)",
+      "Read(//home/node/**)",
+      "Bash(find / -maxdepth 6 -name \"javac\")",
+      "Bash(JAVA_HOME=/home/node/tools/jdk-21.0.12.1+1 /home/node/tools/apache-maven-3.9.9/bin/mvn -q -o test -Dtest='CodeGenerationTest,AuditTrailTest' -Dsurefire.failIfNoSpecifiedTests=false 2>&1 | tail -25; echo \"EXIT=$?\")",
+      "Bash(JAVA_HOME=/home/node/tools/jdk-21.0.12.1+1 /home/node/tools/apache-maven-3.9.9/bin/mvn -o test)",
+      "Bash(mvn -v)"
     ]
   }
 }

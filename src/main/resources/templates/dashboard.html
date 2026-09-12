@@ -11,7 +11,7 @@
       <h2 style="margin:0">月台现状 · <span th:text="${#temporals.format(view.date,'yyyy-MM-dd')}"></span></h2>
       <span class="muted" id="clock"></span>
       <span class="spacer" style="flex:1"></span>
-      <a class="btn secondary small" th:href="@{/fees/download}">⬇ 下载当天核费明细 CSV</a>
+      <a sec:authorize="hasAnyRole('CARRIER','DISPATCHER')" class="btn secondary small" th:href="@{/fees/download}">⬇ 下载当天核费明细 CSV</a>
       <button class="btn secondary small" id="refreshBtn" type="button">刷新</button>
     </div>
 
@@ -39,7 +39,7 @@
       <div class="kpi" th:text="${view.waiting.size()}">0</div>
       <div class="kpi-label">等待 / 已派台车辆数</div>
     </div>
-    <div class="panel">
+    <div class="panel" sec:authorize="hasAnyRole('CARRIER','DISPATCHER')">
       <div class="kpi" th:text="${#numbers.formatDecimal(view.todayFeeTotal,1,2)} + ' 元'">0 元</div>
       <div class="kpi-label">今日核费最终金额合计（<span th:text="${view.todayFees.size()}">0</span> 单）</div>
     </div>
@@ -73,7 +73,7 @@
       </table>
     </div>
 
-    <div class="panel">
+    <div class="panel" sec:authorize="hasAnyRole('CARRIER','DISPATCHER')">
       <h2>今日核费明细（页面口径，与下载 CSV 一致）</h2>
       <table>
         <thead><tr><th>车牌</th><th>等待(分)</th><th>计费(分)</th><th>原始金额</th><th>最终金额</th><th>状态</th></tr></thead>

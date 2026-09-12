@@ -38,8 +38,15 @@ public class Dispute {
     @Column(name = "raised_by", nullable = false)
     private Long raisedBy;
 
-    @Column(name = "raised_at", nullable = false)
-    private Instant raisedAt = Instant.now();
+    @Column(name = "raised_at", nullable = false, updatable = false)
+    private Instant raisedAt;
+
+    @PrePersist
+    void prePersist() {
+        if (raisedAt == null) {
+            raisedAt = BusinessTime.now();
+        }
+    }
 
     @Column(name = "resolved_by")
     private Long resolvedBy;

@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('无权访问')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+  <div class="panel" style="max-width:640px">
+    <h2>403 · 无权访问该资源</h2>
+    <div class="flash err" th:if="${message}" th:text="${message}">无权访问</div>
+    <div class="flash err" th:unless="${message}">你没有访问该数据或执行该操作的权限（数据仅限所属承运商）。</div>
+    <p class="muted">如认为这是误判，请联系调度员或系统管理员。</p>
+    <a class="btn" th:href="@{/}">回首页</a>
+  </div>
+</div>
+</body>
+</html>

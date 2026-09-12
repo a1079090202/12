@@ -1,6 +1,7 @@
 package com.example.dockyard.web;
 
 import com.example.dockyard.security.CurrentUser;
+import com.example.dockyard.security.LoginUser;
 import com.example.dockyard.service.DashboardService;
 import com.example.dockyard.service.YardClock;
 import org.springframework.stereotype.Controller;
@@ -20,9 +21,10 @@ public class DashboardController {
 
     @GetMapping({"/", "/dashboard"})
     public String dashboard(Model model) {
-        var view = dashboard.build(clock.today());
+        LoginUser me = CurrentUser.get();
+        var view = dashboard.build(clock.today(), me.getRole(), me.getCarrierId());
         model.addAttribute("view", view);
-        model.addAttribute("me", CurrentUser.get());
+        model.addAttribute("me", me);
         model.addAttribute("clock", clock);
         return "dashboard";
     }

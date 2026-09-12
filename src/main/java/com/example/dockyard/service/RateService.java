@@ -8,8 +8,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
+import java.util.List;
 
-/** 承运商当日费率维护。注意：改价只影响之后核费的单，已核费单保存的是费率快照。 */
+/**
+ * 承运商当日费率维护。注意：
+ *  - 费率按上海自然日生效，改价只影响之后核费的单，已核费单保存的是费率快照；
+ *  - 核费区间内任何一天缺费率，FeeService 会直接拒绝核费，不存在静默兜底费率，
+ *    因此调度员必须在车辆出场前把涉及日期的费率配齐（含可能跨日的次日）。
+ */
 @Service
 public class RateService {
 
@@ -35,5 +41,11 @@ public class RateService {
         rate.setRatePerHour(ratePerHour);
         rate.setCreatedBy(actorId);
         rates.save(rate);
+    }
+
+    /** 某时间区间内（含首尾）已配置的日费率，供费率管理页展示缺口 */
+    @Transactional(readOnly = true)
+    public List<CarrierDailyRate> listBetween(LocalDate from, LocalDate to) {
+        return rates.findByRateDateBetweenOrderByRateDateAsc(from, to);
     }
 }

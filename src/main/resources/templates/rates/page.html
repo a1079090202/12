@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('费率配置')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+  <div class="panel">
+    <h2>承运商当日费率（上海自然日，元/小时）</h2>
+    <div th:if="${param.saved}" class="flash ok">费率已保存。改价只影响之后核费的单，已核费单保留费率快照。</div>
+    <div class="flash warn">
+      出场核费时，<b>计费区间覆盖的每一天（含跨日的次日）都必须已配置当日费率</b>；
+      缺费率会拒绝该单出场核费，不会按默认价结算。免费时长内出场的单无需费率。
+    </div>
+
+    <form class="inline" th:action="@{/rates}" method="get" style="margin:10px 0">
+      <label>窗口起始日</label>
+      <input type="date" name="from" th:value="${start}" required style="padding:4px 8px">
+      <button class="btn small" type="submit">切换窗口</button>
+      <span class="muted">当前展示 <span th:text="${start}"></span> 至 <span th:text="${end}"></span>（14 天）</span>
+    </form>
+
+    <div style="overflow-x:auto">
+    <table>
+      <thead>
+      <tr>
+        <th>承运商</th>
+        <th th:each="d : ${dates}" th:text="${#temporals.format(d,'MM-dd')}"></th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr th:each="c : ${carrierList}">
+        <td class="nowrap">
+          <span th:text="${c.name}"></span><br>
+          <span class="muted mono" th:text="${c.code}"></span>
+        </td>
+        <td th:each="d : ${dates}" style="min-width:96px">
+          <form class="stacked" th:action="@{/rates}" method="post" style="gap:2px">
+            <input type="hidden" name="carrierId" th:value="${c.id}">
+            <input type="hidden" name="date" th:value="${d}">
+            <input name="ratePerHour" type="number" step="0.01" min="0" required
+                   th:value="${matrix[c.id + '|' + d]}"
+                   placeholder="未配置"
+                   style="width:80px;padding:2px 6px">
+            <button class="btn small" type="submit">保存</button>
+          </form>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>

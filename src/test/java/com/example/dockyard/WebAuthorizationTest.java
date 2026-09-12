@@ -45,6 +45,10 @@ class WebAuthorizationTest extends AbstractIntegrationTest {
         mvc.perform(get("/disputes").with(user("carrier1").roles("CARRIER")))
                 .andExpect(status().isForbidden());
 
+        // 承运商访问费率配置（仅调度）
+        mvc.perform(get("/rates").with(user("carrier1").roles("CARRIER")))
+                .andExpect(status().isForbidden());
+
         // 未登录访问首页 -> 重定向到登录
         mvc.perform(get("/"))
                 .andExpect(status().is3xxRedirection());

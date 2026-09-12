@@ -12,19 +12,18 @@
 
     <form class="stacked" th:action="@{/login}" method="post">
       <label>用户名</label>
-      <input name="username" autofocus required>
+      <input name="username" autocomplete="username" autofocus required>
       <label>密码</label>
-      <input name="password" type="password" required>
+      <input name="password" type="password" autocomplete="current-password" required>
       <div style="margin-top:16px">
         <button class="btn" type="submit" style="width:100%">登录</button>
       </div>
     </form>
 
-    <div class="login-accounts">
-      初始化账号（密码相同）：<br>
-      承运商 <code>carrier1</code> / <code>carrier2</code><br>
-      门卫 <code>guard</code> · 仓库 <code>warehouse</code> · 调度 <code>dispatcher</code>
-    </div>
+    <p class="muted login-accounts">
+      初始账号由管理员在部署时通过 <code>INIT_PASSWORD</code> 指定；未指定时系统在首次启动
+      生成随机密码并输出于应用日志（仅一次）。忘记密码请联系管理员重置。
+    </p>
   </div>
 </div>
 </body>

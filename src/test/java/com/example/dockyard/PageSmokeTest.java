@@ -32,6 +32,7 @@ class PageSmokeTest extends AbstractIntegrationTest {
         MockHttpSession dispatcher = login("dispatcher");
         expectOk(dispatcher, "/");
         expectOk(dispatcher, "/dispatch");
+        expectOk(dispatcher, "/rates");
         expectOk(dispatcher, "/appointments/override");
         expectOk(dispatcher, "/disputes");
 

@@ -14,8 +14,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * 预约：30 分钟槽位容量拦截 + 调度员写明原因插单。
- * 接口层只收参数，排队/容量规则集中在这里。
+ * 预约：槽位容量拦截（槽长 app.slot.length-minutes、容量 app.slot.capacity 均可配）
+ * + 调度员写明原因插单。接口层只收参数，排队/容量规则集中在这里。
  */
 @Service
 public class AppointmentService {
@@ -24,6 +24,7 @@ public class AppointmentService {
     private final EventLogService events;
     private final YardClock clock;
     private final EntityManager em;
+    private final AppointmentCodeGenerator codeGenerator;
 
     @Value("${app.slot.length-minutes:30}")
     private int slotMinutes;
@@ -32,11 +33,12 @@ public class AppointmentService {
     private int slotCapacity;
 
     public AppointmentService(AppointmentRepository appointments, EventLogService events,
-                              YardClock clock, EntityManager em) {
+                              YardClock clock, EntityManager em, AppointmentCodeGenerator codeGenerator) {
         this.appointments = appointments;
         this.events = events;
         this.clock = clock;
         this.em = em;
+        this.codeGenerator = codeGenerator;
     }
 
     public record BookingRequest(String orderNo, String plateNo, String driverName, String driverPhone,
@@ -44,8 +46,12 @@ public class AppointmentService {
                                  LocalDate slotDate, String slotTime /* HH:mm */) {}
 
     /**
-     * 承运商提交预约。槽位按上海墙钟 30 分钟整点切分，
+     * 承运商提交预约。槽位按上海墙钟整点切分（槽长 app.slot.length-minutes），
      * 同一槽位有效预约数（不含已取消）达到容量即拒绝。
+     *
+     * 并发安全：先对 slotStart 取事务级咨询锁，把同一槽位的并发提交串行化——
+     * 后到事务在锁上等待，拿到锁后重新计数，必然看到先到事务已提交的预约，
+     * 从而干净地拒绝超额（消除“先计数后插入”的 TOCTOU 超卖竞态）。
      */
     @Transactional
     @PreAuthorize("hasRole('CARRIER')")
@@ -54,6 +60,7 @@ public class AppointmentService {
                 clock.parseDateTime(req.slotDate(), req.slotTime()), slotMinutes);
         Instant slotEnd = slotStart.plusSeconds(slotMinutes * 60L);
 
+        lockSlot(slotStart);
         long used = appointments.countBySlotStartAndStatusNot(slotStart, AppointmentStatus.CANCELLED);
         if (used >= slotCapacity) {
             throw new BusinessRuleException(
@@ -62,7 +69,7 @@ public class AppointmentService {
         }
 
         Appointment appt = new Appointment();
-        appt.setCode(nextCode(slotStart));
+        appt.setCode(codeGenerator.next(slotStart));
         appt.setCarrierId(carrierId);
         appt.setOrderNo(req.orderNo());
         appt.setPlateNo(normalizePlate(req.plateNo()));
@@ -82,6 +89,7 @@ public class AppointmentService {
 
     /**
      * 调度员插单：绕过容量限制，但必须写明原因；原因与操作人留痕。
+     * 同样先取槽位咨询锁，保证“计数（写进留痕文案）+ 插入”相对并发提交是串行一致的。
      */
     @Transactional
     @PreAuthorize("hasRole('DISPATCHER')")
@@ -93,10 +101,11 @@ public class AppointmentService {
                 clock.parseDateTime(req.slotDate(), req.slotTime()), slotMinutes);
         Instant slotEnd = slotStart.plusSeconds(slotMinutes * 60L);
 
+        lockSlot(slotStart);
         long used = appointments.countBySlotStartAndStatusNot(slotStart, AppointmentStatus.CANCELLED);
 
         Appointment appt = new Appointment();
-        appt.setCode(nextCode(slotStart));
+        appt.setCode(codeGenerator.next(slotStart));
         appt.setCarrierId(carrierId);
         appt.setOrderNo(req.orderNo());
         appt.setPlateNo(normalizePlate(req.plateNo()));
@@ -119,19 +128,21 @@ public class AppointmentService {
     @Transactional
     @PreAuthorize("hasAnyRole('CARRIER','DISPATCHER')")
     public void cancel(Long apptId, Long actorId) {
-        Appointment appt = appointments.findById(apptId)
+        // 行锁串行化：与门卫进场在同一预约行上互斥，杜绝“边进场边取消”。
+        // 状态判断在锁内进行，两个并发取消也只会有一个成功。
+        Appointment appt = appointments.lockById(apptId)
                 .orElseThrow(() -> new BusinessRuleException("预约不存在"));
         // 承运商只能取消本司预约；调度员可取消任意单
         var me = com.example.dockyard.security.CurrentUser.get();
         if (me.getRole() == Role.CARRIER && !appt.getCarrierId().equals(me.getCarrierId())) {
-            throw new BusinessRuleException("只能取消本承运商的预约");
+            throw new ForbiddenException("只能取消本承运商的预约");
         }
         if (appt.getStatus() != AppointmentStatus.BOOKED && appt.getStatus() != AppointmentStatus.OVERRIDDEN) {
             throw new BusinessRuleException("车辆已进入流程，不能取消");
         }
         appt.setStatus(AppointmentStatus.CANCELLED);
         appointments.save(appt);
-        events.record(apptId, EventType.BOOKED, actorId, null, "预约已取消");
+        events.record(apptId, EventType.CANCELLED, actorId, null, "预约已取消");
     }
 
     public List<Appointment> daySchedule(LocalDate date) {
@@ -142,16 +153,17 @@ public class AppointmentService {
         return appointments.findByCarrierIdOrderByCreatedAtDesc(carrierId);
     }
 
-    /** 预约码：YYMMDD + 序列号，序列取自数据库，保证多人并发不重码 */
-    private String nextCode(Instant slotStart) {
-        String dayPart = java.time.LocalDate.ofInstant(slotStart, YardClock.ZONE)
-                .format(java.time.format.DateTimeFormatter.ofPattern("yyMMdd"));
-        Long seq = ((Number) em.createNativeQuery("select nextval('appt_code_seq')")
-                .getSingleResult()).longValue();
-        return "YY" + dayPart + String.format("%04d", seq % 10000);
-    }
-
     private String normalizePlate(String plate) {
         return plate == null ? null : plate.strip().toUpperCase().replace(" ", "");
+    }
+
+    /**
+     * 事务级咨询锁：把同一槽位的并发预约/插单串行化，消除“先计数后插入”的超卖竞态。
+     * key 由槽位起点文本哈希得到（hashtextextended 为 PG 11+ 内置函数），锁随事务提交/回滚自动释放。
+     */
+    private void lockSlot(Instant slotStart) {
+        em.createNativeQuery("select pg_advisory_xact_lock(hashtextextended(?1, 0))")
+                .setParameter(1, "appt-slot:" + slotStart.toString())
+                .getSingleResult();
     }
 }

@@ -19,9 +19,15 @@ public class YardClock {
 
     private volatile Clock clock = Clock.system(ZONE);
 
-    /** 仅供测试替换时钟 */
+    public YardClock() {
+        // 让实体审计时间戳（@PrePersist 经 BusinessTime）与业务时钟同源
+        com.example.dockyard.domain.BusinessTime.install(clock);
+    }
+
+    /** 仅供测试替换时钟；同时同步给实体审计时间戳桥，保证全站一个“现在” */
     public void setClock(Clock clock) {
         this.clock = clock;
+        com.example.dockyard.domain.BusinessTime.install(clock);
     }
 
     public Instant now() {
@@ -52,7 +58,7 @@ public class YardClock {
         return ZonedDateTime.of(date, time, ZONE).toInstant();
     }
 
-    /** 把任意时刻向下取整到 30 分钟槽位起点（上海墙钟口径） */
+    /** 把任意时刻向下取整到 slotMinutes 分钟槽位起点（上海墙钟口径；槽长见 app.slot.length-minutes） */
     public Instant truncateToSlot(Instant instant, int slotMinutes) {
         ZonedDateTime z = instant.atZone(ZONE);
         int minute = z.getMinute();

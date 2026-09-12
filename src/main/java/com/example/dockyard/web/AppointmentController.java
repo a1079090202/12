@@ -5,10 +5,13 @@ import com.example.dockyard.repo.CarrierRepository;
 import com.example.dockyard.security.CurrentUser;
 import com.example.dockyard.security.LoginUser;
 import com.example.dockyard.service.AppointmentService;
-import com.example.dockyard.service.BusinessRuleException;
 import com.example.dockyard.service.YardClock;
+import com.example.dockyard.web.form.BookingForm;
+import com.example.dockyard.web.form.OverrideForm;
+import jakarta.validation.Valid;
 import org.springframework.stereotype.Controller;
 import org.springframework.ui.Model;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDate;
@@ -17,6 +20,7 @@ import java.util.List;
 
 /**
  * 预约接口：只负责收参数、取当前登录人、转调 AppointmentService。
+ * 表单字段全部经 Bean Validation 校验（长度/格式/日期），非法输入 400，不透传到数据库。
  */
 @Controller
 @RequestMapping("/appointments")
@@ -53,17 +57,12 @@ public class AppointmentController {
     }
 
     @PostMapping
-    public String book(@RequestParam String orderNo,
-                       @RequestParam String plateNo,
-                       @RequestParam String driverName,
-                       @RequestParam(required = false) String driverPhone,
-                       @RequestParam String cargoType,
-                       @RequestParam DockType dockType,
-                       @RequestParam LocalDate slotDate,
-                       @RequestParam String slotTime) {
+    public String book(@Valid @ModelAttribute BookingForm form, BindingResult br) {
+        if (br.hasErrors()) {
+            throw new com.example.dockyard.service.BusinessRuleException(WebForms.firstError(br));
+        }
         LoginUser me = CurrentUser.get();
-        var req = new AppointmentService.BookingRequest(
-                orderNo, plateNo, driverName, driverPhone, cargoType, dockType, slotDate, slotTime);
+        var req = toRequest(form);
         var appt = appointments.book(req, me.getCarrierId(), me.getId());
         return "redirect:/appointments/" + appt.getId() + "?booked=1";
     }
@@ -86,23 +85,13 @@ public class AppointmentController {
     }
 
     @PostMapping("/override")
-    public String override(@RequestParam Long carrierId,
-                           @RequestParam String orderNo,
-                           @RequestParam String plateNo,
-                           @RequestParam String driverName,
-                           @RequestParam(required = false) String driverPhone,
-                           @RequestParam String cargoType,
-                           @RequestParam DockType dockType,
-                           @RequestParam LocalDate slotDate,
-                           @RequestParam String slotTime,
-                           @RequestParam String reason) {
-        LoginUser me = CurrentUser.get();
-        if (carrierId == null) {
-            throw new BusinessRuleException("插单必须选择承运商");
+    public String override(@Valid @ModelAttribute OverrideForm form, BindingResult br) {
+        if (br.hasErrors()) {
+            throw new com.example.dockyard.service.BusinessRuleException(WebForms.firstError(br));
         }
-        var req = new AppointmentService.BookingRequest(
-                orderNo, plateNo, driverName, driverPhone, cargoType, dockType, slotDate, slotTime);
-        var appt = appointments.override(req, carrierId, me.getId(), reason);
+        LoginUser me = CurrentUser.get();
+        var appt = appointments.override(toRequest(form), form.getCarrierId(),
+                me.getId(), form.getReason().strip());
         return "redirect:/appointments/" + appt.getId() + "?overridden=1";
     }
 
@@ -110,5 +99,17 @@ public class AppointmentController {
     public String cancel(@PathVariable Long id) {
         appointments.cancel(id, CurrentUser.id());
         return "redirect:/appointments/" + id;
+    }
+
+    private AppointmentService.BookingRequest toRequest(BookingForm f) {
+        return new AppointmentService.BookingRequest(
+                f.getOrderNo().strip(),
+                f.getPlateNo().strip(),
+                f.getDriverName().strip(),
+                f.getDriverPhone() == null || f.getDriverPhone().isBlank() ? null : f.getDriverPhone().strip(),
+                f.getCargoType().strip(),
+                f.getDockType(),
+                f.getSlotDate(),
+                f.getSlotTime());
     }
 }

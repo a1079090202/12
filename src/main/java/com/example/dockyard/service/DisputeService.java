@@ -41,7 +41,7 @@ public class DisputeService {
         FeeSettlement fs = settlements.findByAppointmentId(appointmentId)
                 .orElseThrow(() -> new BusinessRuleException("还没有核费单，暂不能提异议"));
         if (!fs.getCarrierId().equals(carrierId)) {
-            throw new BusinessRuleException("只能对本承运商的核费单提异议");
+            throw new ForbiddenException("只能对本承运商的核费单提异议");
         }
         if (reason == null || reason.strip().isBlank()) {
             throw new BusinessRuleException("异议原因不能为空");
@@ -59,10 +59,19 @@ public class DisputeService {
         d.setStatus(DisputeStatus.OPEN);
         d.setOriginalAmount(fs.getFinalAmount());
         d.setRaisedBy(actorId);
-        disputes.save(d);
+        try {
+            // 立即落库，让部分唯一索引 uq_dispute_open_per_appt 在本事务内生效：
+            // 并发双击时两个事务都通过了上面的 OPEN 预检，仅一个能插入成功，
+            // 另一个在此撞唯一索引，转成友好业务错误（否则会冒出 500 且产生两条 OPEN）。
+            disputes.saveAndFlush(d);
+        } catch (org.springframework.dao.DataIntegrityViolationException dup) {
+            throw new BusinessRuleException("该单已有待处理的异议，请勿重复提交");
+        }
 
         fs.setStatus(FeeStatus.DISPUTED);
         settlements.save(fs);
+        events.record(appointmentId, EventType.DISPUTE_RAISED, actorId, null,
+                "提起异议：" + d.getReason() + "（提起时金额 " + d.getOriginalAmount() + " 元）");
         return d;
     }
 
@@ -83,7 +92,7 @@ public class DisputeService {
         fs.setStatus(FeeStatus.UPHELD);
         // 刻意不改 fs.finalAmount / originalAmount
         settlements.save(fs);
-        events.record(fs.getAppointmentId(), EventType.FEE_SETTLED, actorId, null,
+        events.record(fs.getAppointmentId(), EventType.DISPUTE_REJECTED, actorId, null,
                 "异议 #" + d.getId() + " 驳回，维持原金额 " + fs.getOriginalAmount() + " 元");
         return d;
     }
@@ -108,7 +117,7 @@ public class DisputeService {
         fs.setStatus(FeeStatus.ADJUSTED);
         fs.setFinalAmount(adjustedAmount);   // originalAmount 保持系统核算值不变
         settlements.save(fs);
-        events.record(fs.getAppointmentId(), EventType.FEE_SETTLED, actorId, null,
+        events.record(fs.getAppointmentId(), EventType.DISPUTE_ADJUSTED, actorId, null,
                 "异议 #" + d.getId() + " 成立，金额 " + fs.getOriginalAmount()
                         + " 元调整为 " + adjustedAmount + " 元（原金额保留）");
         return d;
@@ -125,7 +134,9 @@ public class DisputeService {
     }
 
     private Dispute open(Long id) {
-        Dispute d = disputes.findById(id)
+        // 悲观行锁：两个调度并发处理同一异议时在此串行，先到者改状态并提交，
+        // 后者拿到锁后看到已非 OPEN，被拒绝，处理结论不可能被并发覆盖。
+        Dispute d = disputes.lockById(id)
                 .orElseThrow(() -> new BusinessRuleException("异议不存在"));
         if (d.getStatus() != DisputeStatus.OPEN) {
             throw new BusinessRuleException("该异议已处理，不能重复处理或覆盖结论");

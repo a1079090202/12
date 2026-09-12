@@ -93,13 +93,27 @@ public class FeeController {
                 + "\n";
     }
 
+    /**
+     * CSV 单元格转义：
+     *  - 逗号 / 双引号 / 换行：按 RFC 4180 加引号包裹；
+     *  - 首字符为 = + - @ Tab CR（含包裹后以这些开头）：前置单引号，
+     *    防止 Excel/WPS 把单元格当公式执行（CSV Formula Injection，
+     *    订单号/货类/司机名均为承运商可控输入）。
+     */
     private String csv(String v) {
         if (v == null) {
             return "";
         }
-        if (v.contains(",") || v.contains("\"") || v.contains("\n")) {
-            return "\"" + v.replace("\"", "\"\"") + "\"";
+        boolean quote = v.contains(",") || v.contains("\"") || v.contains("\n") || v.contains("\r");
+        String out = v.replace("\"", "\"\"");
+        if (isFormulaFirstChar(out.charAt(0))) {
+            out = "'" + out;
+            quote = true; // 单引号前缀需随引号包裹保留
         }
-        return v;
+        return quote ? "\"" + out + "\"" : out;
+    }
+
+    private boolean isFormulaFirstChar(char c) {
+        return c == '=' || c == '+' || c == '-' || c == '@' || c == '\t' || c == '\r';
     }
 }

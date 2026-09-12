@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('服务器错误')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+  <div class="panel" style="max-width:640px">
+    <h2>500 · 服务器内部错误</h2>
+    <div class="flash err">服务器处理请求时发生错误，错误已记录，请稍后重试或联系管理员。</div>
+    <a class="btn" th:href="@{/}">回首页</a>
+  </div>
+</div>
+</body>
+</html>

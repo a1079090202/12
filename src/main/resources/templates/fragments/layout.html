@@ -16,15 +16,17 @@
     <a sec:authorize="hasRole('CARRIER')" th:href="@{/appointments/new}">新建预约</a>
     <a sec:authorize="hasRole('GUARD')" th:href="@{/gate}">门卫进场</a>
     <a sec:authorize="hasRole('DISPATCHER')" th:href="@{/dispatch}">排队叫号</a>
+    <a sec:authorize="hasRole('DISPATCHER')" th:href="@{/rates}">费率配置</a>
     <a sec:authorize="hasRole('DISPATCHER')" th:href="@{/appointments/override}">调度插单</a>
     <a sec:authorize="hasRole('DISPATCHER')" th:href="@{/disputes}">异议处理</a>
     <a sec:authorize="hasRole('WAREHOUSE')" th:href="@{/warehouse}">仓库作业</a>
-    <a th:href="@{/fees/download}">下载核费明细</a>
+    <a sec:authorize="hasAnyRole('CARRIER','DISPATCHER')" th:href="@{/fees/download}">下载核费明细</a>
   </nav>
   <span class="spacer"></span>
   <span class="user">
     <span sec:authentication="principal.username">user</span>
     （<span sec:authentication="principal.displayName">用户</span>）
+    · <a th:href="@{/account/password}">改密</a>
   </span>
   <form th:action="@{/logout}" method="post">
     <button class="btn-logout" type="submit">退出</button>
