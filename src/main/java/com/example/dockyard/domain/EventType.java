@@ -16,7 +16,9 @@ public enum EventType {
     FEE_SETTLED("出场核费"),
     DISPUTE_RAISED("承运商提起异议"),
     DISPUTE_REJECTED("异议驳回维持原价"),
-    DISPUTE_ADJUSTED("异议成立调整金额");
+    DISPUTE_ADJUSTED("异议成立调整金额"),
+    MAINT_PENDING("月台停用标记改约待定"),
+    RESCHEDULED("月台停用改期");
 
     private final String label;
 

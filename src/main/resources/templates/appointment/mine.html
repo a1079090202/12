@@ -22,13 +22,15 @@
         <td th:text="${a.dockType.label}"></td>
         <td class="nowrap" th:text="${clock.formatDateTime(a.slotStart)}"></td>
         <td><span class="badge info" th:text="${a.status.label}"></span>
-            <span th:if="${a.status.name() == 'OVERRIDDEN'}" class="badge early">插单</span></td>
+            <span th:if="${a.status.name() == 'OVERRIDDEN'}" class="badge early">插单</span>
+            <span th:if="${a.status.name() == 'RESCHEDULE_PENDING'}" class="badge late">月台保养，暂停进场</span></td>
         <td>
           <span th:if="${a.lateFlag}" class="badge late" th:text="'迟到 ' + ${a.lateMinutes} + ' 分'"></span>
           <span th:if="${a.earlyArrival}" class="badge early">早到</span>
         </td>
         <td class="nowrap">
-          <form class="inline" th:if="${a.status.name() == 'BOOKED' || a.status.name() == 'OVERRIDDEN'}"
+          <form class="inline"
+                th:if="${a.status.name() == 'BOOKED' || a.status.name() == 'OVERRIDDEN' || a.status.name() == 'RESCHEDULE_PENDING'}"
                 th:action="@{/appointments/{id}/cancel(id=${a.id})}" method="post"
                 onsubmit="return confirm('确认取消该预约？')">
             <button class="btn secondary small" type="submit">取消</button>

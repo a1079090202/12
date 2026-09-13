@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('停用详情 · 受影响预约')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+
+  <div th:if="${param.registered}" class="flash ok">停用登记成功。下表列出落在停用窗内、尚未进场的受影响预约，请逐条改期或标记改约待定。</div>
+  <div th:if="${param.rescheduled}" class="flash ok">已改期：原时段已留档，预约内容未变，可在预约详情查看完整记录。</div>
+  <div th:if="${param.pending}" class="flash ok">已标记改约待定：该单释放容量、门卫不予放行，待确定新时段后再改期。</div>
+  <div th:if="${param.cancelled}" class="flash warn">该停用已取消，容量恢复；此前标记改约待定的单仍需逐条改期。</div>
+
+  <div class="panel" style="margin-bottom:16px">
+    <h2>
+      <span th:text="${dock.code} + ' · ' + ${dock.name}">D5</span>
+      <span class="badge late" th:if="${m.status == 'SCHEDULED'}">生效中</span>
+      <span class="badge gray" th:if="${m.status == 'CANCELLED'}">已取消</span>
+    </h2>
+    <table>
+      <tr><th>停用时段</th>
+        <td class="nowrap"
+            th:text="${clock.formatDateTime(m.windowStart)} + ' – ' + ${clock.formatTime(m.windowEnd)}"></td></tr>
+      <tr><th>月台类型</th><td th:text="${dock.dockType.label}"></td></tr>
+      <tr><th>停用原因</th><td th:text="${m.reason}"></td></tr>
+      <tr><th>登记人 / 时间</th>
+        <td><span th:text="${creatorName}"></span> · <span th:text="${clock.formatDateTime(m.createdAt)}"></span></td></tr>
+      <tr th:if="${m.status == 'CANCELLED'}"><th>取消原因</th>
+        <td th:text="${m.cancelReason}"></td></tr>
+    </table>
+
+    <div th:if="${m.status == 'SCHEDULED'}" style="margin-top:12px">
+      <form class="inline" th:action="@{/maintenance/{id}/cancel(id=${m.id})}" method="post"
+            onsubmit="return confirm('取消停用后该月台容量即时恢复，确认取消？')"
+            style="display:flex;gap:8px;max-width:520px">
+        <input type="text" name="reason" maxlength="500" required placeholder="取消停用的原因（必填）"
+               style="flex:1;padding:6px 10px;border:1px solid #cbd4dc;border-radius:8px">
+        <button class="btn danger small" type="submit">取消停用</button>
+      </form>
+    </div>
+  </div>
+
+  <div class="panel" th:if="${m.status == 'SCHEDULED'}" style="margin-bottom:16px">
+    <h2>受影响预约（<span th:text="${impacted.size()}">0</span> 单）
+      <span class="muted" style="font-size:13px;font-weight:400">停用窗内、同类型、尚未进场</span>
+    </h2>
+    <table>
+      <thead><tr>
+        <th>预约码 / 车牌</th><th>货类</th><th>原时段</th><th>状态</th>
+        <th style="width:340px">调度处置</th>
+      </tr></thead>
+      <tbody>
+      <tr th:each="a : ${impacted}">
+        <td>
+          <a class="mono" th:href="@{/appointments/{id}(id=${a.id})}" th:text="${a.code}"></a>
+          <div class="mono" th:text="${a.plateNo}"></div>
+        </td>
+        <td th:text="${a.cargoType}"></td>
+        <td class="nowrap"
+            th:text="${clock.formatDateTime(a.slotStart)} + '–' + ${clock.formatTime(a.slotEnd)}"></td>
+        <td><span class="badge info" th:text="${a.status.label}"></span></td>
+        <td>
+          <form class="stacked" th:action="@{/maintenance/{id}/reschedule(id=${m.id})}" method="post"
+                style="margin-bottom:8px">
+            <input type="hidden" name="apptId" th:value="${a.id}">
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="date" name="targetDate" required th:min="${today}" style="padding:5px 8px">
+              <select name="targetHM" required>
+                <option th:each="t : ${slotTimes}" th:value="${t}" th:text="${t}"></option>
+              </select>
+            </div>
+            <input type="text" name="reason" maxlength="500" required placeholder="改期原因（必填）"
+                   style="width:100%;margin-top:6px;padding:5px 8px;border:1px solid #cbd4dc;border-radius:8px">
+            <button class="btn small" type="submit" style="margin-top:6px">改期到此时段</button>
+          </form>
+          <form class="inline" th:action="@{/maintenance/{id}/pending(id=${m.id})}" method="post"
+                style="display:flex;gap:6px">
+            <input type="hidden" name="apptId" th:value="${a.id}">
+            <input type="text" name="reason" maxlength="500" required placeholder="待定原因（必填）"
+                   style="flex:1;padding:5px 8px;border:1px solid #cbd4dc;border-radius:8px">
+            <button class="btn secondary small" type="submit">改约待定</button>
+          </form>
+        </td>
+      </tr>
+      <tr th:if="${impacted.isEmpty()}">
+        <td colspan="5" class="muted">停用窗内没有尚未进场的同类型预约（可能均已处置或已进场）。</td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel" th:if="${!pendingList.isEmpty()}" style="margin-bottom:16px">
+    <h2>待改期预约（<span th:text="${pendingList.size()}">0</span> 单）
+      <span class="muted" style="font-size:13px;font-weight:400">已标记改约待定、释放容量且门卫暂不放行，确定新时段后在此改期</span>
+    </h2>
+    <table>
+      <thead><tr><th>预约码 / 车牌</th><th>货类</th><th>原时段</th><th style="width:340px">改期到</th></tr></thead>
+      <tbody>
+      <tr th:each="a : ${pendingList}">
+        <td>
+          <a class="mono" th:href="@{/appointments/{id}(id=${a.id})}" th:text="${a.code}"></a>
+          <div class="mono" th:text="${a.plateNo}"></div>
+        </td>
+        <td th:text="${a.cargoType}"></td>
+        <td class="nowrap"
+            th:text="${clock.formatDateTime(a.slotStart)} + '–' + ${clock.formatTime(a.slotEnd)}"></td>
+        <td>
+          <form class="stacked" th:action="@{/maintenance/{id}/reschedule(id=${m.id})}" method="post">
+            <input type="hidden" name="apptId" th:value="${a.id}">
+            <div style="display:flex;gap:6px;align-items:center">
+              <input type="date" name="targetDate" required th:min="${today}" style="padding:5px 8px">
+              <select name="targetHM" required>
+                <option th:each="t : ${slotTimes}" th:value="${t}" th:text="${t}"></option>
+              </select>
+            </div>
+            <input type="text" name="reason" maxlength="500" required placeholder="改期原因（必填）"
+                   style="width:100%;margin-top:6px;padding:5px 8px;border:1px solid #cbd4dc;border-radius:8px">
+            <button class="btn small" type="submit" style="margin-top:6px">确认改期</button>
+          </form>
+        </td>
+      </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="panel">
+    <h2>处置记录（只追加，原时段永久留档）</h2>
+    <table>
+      <thead><tr>
+        <th>时间</th><th>预约码 / 车牌</th><th>动作</th><th>原时段 → 新时段</th>
+        <th>原因</th><th>操作人</th>
+      </tr></thead>
+      <tbody>
+      <tr th:each="row : ${actions}">
+        <td class="nowrap" th:text="${clock.formatDateTime(row.record.actedAt)}"></td>
+        <td>
+          <a th:if="${row.appt != null}" class="mono"
+             th:href="@{/appointments/{id}(id=${row.appt.id})}"
+             th:text="${(row.appt != null ? row.appt.code : '#' + row.record.appointmentId)}"></a>
+          <span th:if="${row.appt == null}" class="mono" th:text="'#' + ${row.record.appointmentId}"></span>
+          <div class="mono muted" th:if="${row.appt != null}" th:text="${row.appt.plateNo}"></div>
+        </td>
+        <td>
+          <span class="badge free" th:if="${row.record.action.name() == 'RESCHEDULED'}">已改期</span>
+          <span class="badge late" th:if="${row.record.action.name() == 'PENDING'}">改约待定</span>
+        </td>
+        <td class="nowrap">
+          <span th:text="${clock.formatDateTime(row.record.originalSlotStart)} + '–' + ${clock.formatTime(row.record.originalSlotEnd)}"></span>
+          <span th:if="${row.record.newSlotStart != null}"> →
+            <b th:text="${clock.formatDateTime(row.record.newSlotStart)} + '–' + ${clock.formatTime(row.record.newSlotEnd)}"></b>
+          </span>
+          <span th:if="${row.record.newSlotStart == null}" class="muted"> → 待定</span>
+        </td>
+        <td th:text="${row.record.reason}"></td>
+        <td class="nowrap" th:text="${row.actorName}"></td>
+      </tr>
+      <tr th:if="${actions.isEmpty()}"><td colspan="6" class="muted">暂无处置记录。</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <p style="margin-top:16px"><a th:href="@{/maintenance}">← 返回月台保养</a></p>
+</div>
+</body>
+</html>

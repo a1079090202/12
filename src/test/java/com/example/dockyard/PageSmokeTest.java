@@ -19,6 +19,7 @@ class PageSmokeTest extends AbstractIntegrationTest {
 
     @Autowired MockMvc mvc;
     @Autowired AppointmentRepository appointmentRepository;
+    @Autowired com.example.dockyard.service.DockMaintenanceService dockMaintenanceService;
 
     private MockHttpSession login(String username) throws Exception {
         MvcResult r = mvc.perform(formLogin().user(username).password("dock1234"))
@@ -35,6 +36,15 @@ class PageSmokeTest extends AbstractIntegrationTest {
         expectOk(dispatcher, "/rates");
         expectOk(dispatcher, "/appointments/override");
         expectOk(dispatcher, "/disputes");
+        // 月台保养：列表页 + 新建一条停用后的详情页（覆盖受影响清单模板）
+        expectOk(dispatcher, "/maintenance");
+        loginAs("dispatcher");
+        Long d5 = jdbcTemplate.queryForObject("select id from dock where code = 'D5'", Long.class);
+        Long maintId = dockMaintenanceService.register(
+                d5,
+                java.time.LocalDate.now(com.example.dockyard.service.YardClock.ZONE).plusDays(2),
+                "08:00", "12:00", "冒烟：例行保养", userId("dispatcher")).getId();
+        expectOk(dispatcher, "/maintenance/" + maintId);
 
         // 门卫
         MockHttpSession guard = login("guard");

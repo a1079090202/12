@@ -75,6 +75,7 @@ a:hover { text-decoration: underline; }
 }
 .dock-card.free { border-top: 4px solid var(--green); }
 .dock-card.busy { border-top: 4px solid var(--amber); }
+.dock-card.maint { border-top: 4px solid var(--red); background: #fdf5f4; }
 .dock-card .dock-code { font-weight: 700; font-size: 16px; }
 .dock-card .dock-type { color: var(--muted); font-size: 12px; margin: 2px 0 8px; }
 .badge {
@@ -86,6 +87,7 @@ a:hover { text-decoration: underline; }
 .badge.early { background: var(--gray-bg); color: var(--muted); }
 .badge.info { background: #e8f1fb; color: var(--brand); }
 .badge.gray { background: var(--gray-bg); color: var(--muted); }
+.badge.maint { background: var(--red-bg); color: var(--red); }
 
 table { width: 100%; border-collapse: collapse; }
 th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }

@@ -2,6 +2,7 @@ package com.example.dockyard.repo;
 
 import com.example.dockyard.domain.Appointment;
 import com.example.dockyard.domain.AppointmentStatus;
+import com.example.dockyard.domain.DockType;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Lock;
@@ -39,6 +40,37 @@ public interface AppointmentRepository extends JpaRepository<Appointment, Long> 
      * 服务层保证 slot_start 一律按 30 分钟整点切槽。
      */
     long countBySlotStartAndStatusNot(Instant slotStart, AppointmentStatus status);
+
+    /**
+     * 统计某 30 分钟槽、某月台类型下仍占用容量的有效预约数：
+     * 已取消与「改约待定」都不占容量（待定车待调度重新安排，停用窗内不再放出容量）。
+     */
+    @Query("""
+            select count(a) from Appointment a
+            where a.slotStart = :slotStart
+              and a.dockType = :dockType
+              and a.status not in (com.example.dockyard.domain.AppointmentStatus.CANCELLED,
+                                   com.example.dockyard.domain.AppointmentStatus.RESCHEDULE_PENDING)
+            """)
+    long countActiveBySlotStartAndDockType(@Param("slotStart") Instant slotStart,
+                                           @Param("dockType") DockType dockType);
+
+    /**
+     * 月台停用受影响清单：与停用窗（[windowStart,windowEnd) 半开）重叠、
+     * 所需类型匹配、且尚未进场（还能改期/待定）的预约，按时段排序。
+     */
+    @Query("""
+            select a from Appointment a
+            where a.dockType = :dockType
+              and a.status in (com.example.dockyard.domain.AppointmentStatus.BOOKED,
+                               com.example.dockyard.domain.AppointmentStatus.OVERRIDDEN)
+              and a.slotStart < :windowEnd
+              and a.slotEnd > :windowStart
+            order by a.slotStart
+            """)
+    List<Appointment> findBookedOverlapping(@Param("dockType") DockType dockType,
+                                            @Param("windowStart") Instant windowStart,
+                                            @Param("windowEnd") Instant windowEnd);
 
     @Query("""
             select a from Appointment a

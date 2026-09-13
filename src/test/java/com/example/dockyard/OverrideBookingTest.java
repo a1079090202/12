@@ -30,29 +30,30 @@ class OverrideBookingTest extends AbstractIntegrationTest {
     }
 
     @Test
-    void capacity_blocks_seventh_then_dispatcher_override_with_reason_succeeds() {
+    void capacity_blocks_fifth_then_dispatcher_override_with_reason_succeeds() {
         loginAs("carrier1");
         Long carrier = carrierIdOf("carrier1");
-        for (int i = 1; i <= 6; i++) {
+        // 普通月台 D1–D4 = 4：4 单约满，第 5 辆被容量拦截
+        for (int i = 1; i <= 4; i++) {
             appointmentService.book(req("测A" + String.format("%03d", i)), carrier, userId("carrier1"));
         }
 
-        // 第 7 辆被容量拦截
+        // 第 5 辆被容量拦截
         assertThatThrownBy(() ->
-                appointmentService.book(req("测A007"), carrier, userId("carrier1")))
+                appointmentService.book(req("测A005"), carrier, userId("carrier1")))
                 .isInstanceOf(BusinessRuleException.class)
-                .hasMessageContaining("容量 6 已满");
+                .hasMessageContaining("容量 4 已满");
 
         // 没写原因不允许插单
         loginAs("dispatcher");
         assertThatThrownBy(() ->
-                appointmentService.override(req("测A007"), carrier, userId("dispatcher"), "  "))
+                appointmentService.override(req("测A005"), carrier, userId("dispatcher"), "  "))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessageContaining("必须写明原因");
 
         // 写明原因后插单成功
         Appointment overridden = appointmentService.override(
-                req("测A007"), carrier, userId("dispatcher"), "客户产线待料，加急插单");
+                req("测A005"), carrier, userId("dispatcher"), "客户产线待料，加急插单");
         assertThat(overridden.getStatus()).isEqualTo(AppointmentStatus.OVERRIDDEN);
         assertThat(overridden.getOverrideReason()).contains("加急插单");
         assertThat(overridden.getOverriddenBy()).isEqualTo(userId("dispatcher"));

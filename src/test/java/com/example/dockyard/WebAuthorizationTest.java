@@ -49,6 +49,15 @@ class WebAuthorizationTest extends AbstractIntegrationTest {
         mvc.perform(get("/rates").with(user("carrier1").roles("CARRIER")))
                 .andExpect(status().isForbidden());
 
+        // 月台保养停用仅调度：承运商 / 门卫直接访问 URL 都是 403（不靠藏按钮）
+        mvc.perform(get("/maintenance").with(user("carrier1").roles("CARRIER")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/maintenance").with(user("guard").roles("GUARD")))
+                .andExpect(status().isForbidden());
+        mvc.perform(post("/maintenance").with(user("guard").roles("GUARD")).with(csrf())
+                        .param("dockId", "1").param("reason", "x"))
+                .andExpect(status().isForbidden());
+
         // 未登录访问首页 -> 重定向到登录
         mvc.perform(get("/"))
                 .andExpect(status().is3xxRedirection());

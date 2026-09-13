@@ -15,7 +15,9 @@ public enum AppointmentStatus {
     COMPLETED("卸货完成"),
     EXITED("已出场"),
     CANCELLED("已取消"),
-    NO_SHOW("失约");
+    NO_SHOW("失约"),
+    /** 月台保养停用受影响、等待调度重新约时段：不占容量、门卫禁止进场 */
+    RESCHEDULE_PENDING("改约待定");
 
     private final String label;
 

@@ -13,6 +13,7 @@
     <div class="panel">
       <h2>预约 <span class="mono" th:text="${appt.code}"></span>
         <span class="badge info" th:text="${appt.status.label}"></span>
+        <span th:if="${appt.status.name() == 'RESCHEDULE_PENDING'}" class="badge late">改约待定：暂停进场，等待调度重新安排</span>
         <span th:if="${appt.lateFlag}" class="badge late">迟到 <span th:text="${appt.lateMinutes}"></span> 分钟</span>
         <span th:if="${appt.earlyArrival}" class="badge early">早到等候</span>
       </h2>
@@ -102,6 +103,31 @@
         </table>
       </div>
     </div>
+  </div>
+
+  <div class="panel" th:if="${!rescheduleRows.isEmpty()}" style="margin-top:16px">
+    <h2>月台保养改期记录（原时段留档，预约内容不被覆盖）</h2>
+    <table>
+      <thead><tr><th>处置时间</th><th>动作</th><th>原时段</th><th>新时段</th><th>原因</th><th>操作人</th></tr></thead>
+      <tbody>
+      <tr th:each="row : ${rescheduleRows}">
+        <td class="nowrap" th:text="${clock.formatDateTime(row.record.actedAt)}"></td>
+        <td>
+          <span class="badge free" th:if="${row.record.action.name() == 'RESCHEDULED'}">已改期</span>
+          <span class="badge late" th:if="${row.record.action.name() == 'PENDING'}">改约待定</span>
+        </td>
+        <td class="nowrap"
+            th:text="${clock.formatDateTime(row.record.originalSlotStart)} + '–' + ${clock.formatTime(row.record.originalSlotEnd)}"></td>
+        <td class="nowrap">
+          <span th:if="${row.record.newSlotStart != null}"
+                th:text="${clock.formatDateTime(row.record.newSlotStart)} + '–' + ${clock.formatTime(row.record.newSlotEnd)}"></span>
+          <span th:if="${row.record.newSlotStart == null}" class="muted">待定</span>
+        </td>
+        <td th:text="${row.record.reason}"></td>
+        <td class="nowrap" th:text="${row.actorName}"></td>
+      </tr>
+      </tbody>
+    </table>
   </div>
 
   <p style="margin-top:16px"><a th:href="@{/}">← 返回首页</a></p>

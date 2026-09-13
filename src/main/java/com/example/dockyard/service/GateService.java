@@ -45,6 +45,10 @@ public class GateService {
                 .orElseThrow(() -> new BusinessRuleException("预约码不存在：" + normalized));
 
         if (appt.getStatus() != AppointmentStatus.BOOKED && appt.getStatus() != AppointmentStatus.OVERRIDDEN) {
+            if (appt.getStatus() == AppointmentStatus.RESCHEDULE_PENDING) {
+                throw new BusinessRuleException("预约码 " + normalized
+                        + " 已标记改约待定（月台保养停用），请联系调度员确认新时段后再进场");
+            }
             throw new BusinessRuleException("预约码 " + normalized + " 已办理进场（当前："
                     + appt.getStatus().getLabel() + "），禁止重复进场");
         }

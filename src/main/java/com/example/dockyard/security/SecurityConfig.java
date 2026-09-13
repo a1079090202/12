@@ -34,7 +34,8 @@ public class SecurityConfig {
                         "/appointments", "/appointments/*/cancel").hasAnyRole("CARRIER", "DISPATCHER")
                 // 门卫
                 .requestMatchers("/gate/**").hasRole("GUARD")
-                // 调度员：排队叫号 / 费率配置 / 异议处理
+                // 调度员：排队叫号 / 费率配置 / 异议处理 / 月台保养停用
+                .requestMatchers("/maintenance", "/maintenance/**").hasRole("DISPATCHER")
                 .requestMatchers("/dispatch/**", "/rates/**").hasRole("DISPATCHER")
                 .requestMatchers(org.springframework.http.HttpMethod.POST, "/disputes/raise").hasRole("CARRIER")
                 .requestMatchers("/disputes", "/disputes/*/reject", "/disputes/*/adjust")

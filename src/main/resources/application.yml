@@ -47,7 +47,8 @@ app:
     password: ${INIT_PASSWORD:}
   slot:
     length-minutes: 30
-    capacity: 6          # 每个 30 分钟时段最多预约车辆数（6 个月台）
+    # 容量不再是固定数字：某类型某 30 分钟槽的可约容量 = 当时未停用的该类型活动月台数
+    # （普通 D1–D4=4 / 冷藏 D5=1 / 大件 D6=1），月台保养停用在 /maintenance 登记后自动扣减
   gate:
     late-tolerance-minutes: 45   # 晚于时段终点超过该宽限标记迟到（边界值不算迟到）
   fee:

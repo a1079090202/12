@@ -17,6 +17,7 @@
     <a sec:authorize="hasRole('GUARD')" th:href="@{/gate}">门卫进场</a>
     <a sec:authorize="hasRole('DISPATCHER')" th:href="@{/dispatch}">排队叫号</a>
     <a sec:authorize="hasRole('DISPATCHER')" th:href="@{/rates}">费率配置</a>
+    <a sec:authorize="hasRole('DISPATCHER')" th:href="@{/maintenance}">月台保养</a>
     <a sec:authorize="hasRole('DISPATCHER')" th:href="@{/appointments/override}">调度插单</a>
     <a sec:authorize="hasRole('DISPATCHER')" th:href="@{/disputes}">异议处理</a>
     <a sec:authorize="hasRole('WAREHOUSE')" th:href="@{/warehouse}">仓库作业</a>

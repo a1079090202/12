@@ -47,8 +47,8 @@ public abstract class AbstractIntegrationTest {
         // 测试固定使用该初始密码（生产默认随机生成）
         registry.add("app.init.password", () -> "dock1234");
         // 显式钉住用例依赖的业务规则参数：application.yml 默认值日后调整不会
-        // 悄悄改变测试口径（容量 6、槽长 30 分钟、免费 90 分钟、迟到宽限 45 分钟）。
-        registry.add("app.slot.capacity", () -> "6");
+        // 悄悄改变测试口径（槽长 30 分钟、免费 90 分钟、迟到宽限 45 分钟）。
+        // 槽位容量不在这里配置：它由“当时可用（未停用）月台数”动态推导（普通 4/冷藏 1/大件 1）。
         registry.add("app.slot.length-minutes", () -> "30");
         registry.add("app.fee.free-minutes", () -> "90");
         registry.add("app.gate.late-tolerance-minutes", () -> "45");
@@ -65,8 +65,9 @@ public abstract class AbstractIntegrationTest {
         yardClock.setClock(Clock.system(YardClock.ZONE));
         // 只清数据，不删表（Flyway 结构保留）；CASCADE 处理外键，RESTART IDENTITY 复位主键
         jdbcTemplate.execute("""
-                TRUNCATE TABLE dispute, fee_segment, fee_settlement, operation_event,
-                             appointment, carrier_daily_rate, app_user, carrier, dock
+                TRUNCATE TABLE appointment_reschedule, dock_maintenance, dispute, fee_segment,
+                             fee_settlement, operation_event, appointment, carrier_daily_rate,
+                             app_user, carrier, dock
                 RESTART IDENTITY CASCADE
                 """);
         jdbcTemplate.execute("ALTER SEQUENCE appt_code_seq RESTART WITH 1");

@@ -2,6 +2,7 @@ package com.example.dockyard.service;
 
 import com.example.dockyard.domain.*;
 import com.example.dockyard.repo.AppointmentRepository;
+import com.example.dockyard.repo.DockMaintenanceRepository;
 import com.example.dockyard.repo.DockRepository;
 import com.example.dockyard.repo.FeeSettlementRepository;
 import org.springframework.stereotype.Service;
@@ -17,19 +18,24 @@ import java.util.*;
 public class DashboardService {
 
     private final DockRepository docks;
+    private final DockMaintenanceRepository maintenances;
     private final AppointmentRepository appointments;
     private final FeeSettlementRepository settlements;
     private final YardClock clock;
 
-    public DashboardService(DockRepository docks, AppointmentRepository appointments,
+    public DashboardService(DockRepository docks, DockMaintenanceRepository maintenances,
+                            AppointmentRepository appointments,
                             FeeSettlementRepository settlements, YardClock clock) {
         this.docks = docks;
+        this.maintenances = maintenances;
         this.appointments = appointments;
         this.settlements = settlements;
         this.clock = clock;
     }
 
-    public record DockStatus(Dock dock, Appointment appt, String phase) {}
+    public record DockStatus(Dock dock, Appointment appt, String phase, DockMaintenance maintenance) {
+        public boolean underMaintenance() { return maintenance != null; }
+    }
 
     public record View(List<DockStatus> dockStatuses, List<Appointment> waiting,
                        long avgTurnSeconds, String avgTurnText, long turnedCount,
@@ -57,6 +63,12 @@ public class DashboardService {
         List<Dock> allDocks = docks.findByActiveTrueOrderByCode();
         List<Appointment> inYard = appointments.findAllInYard();
 
+        // 当前时刻处于保养停用窗的月台（首页一眼可辨；与车辆占用相互独立，可同时存在）
+        Map<Long, DockMaintenance> maintByDock = new HashMap<>();
+        for (DockMaintenance m : maintenances.findActiveAt(clock.now())) {
+            maintByDock.putIfAbsent(m.getDockId(), m);
+        }
+
         Map<Long, Appointment> byDock = new HashMap<>();
         for (Appointment a : inYard) {
             if (a.getAssignedDockId() != null) {
@@ -70,7 +82,8 @@ public class DashboardService {
             // 承运商看板不暴露别司在月台车辆的身份信息，只保留忙闲/作业阶段
             Appointment visible = (a != null && (!carrierScope || a.getCarrierId().equals(carrierId)))
                     ? a : null;
-            statuses.add(new DockStatus(d, visible, a == null ? "空闲" : phaseLabel(a)));
+            statuses.add(new DockStatus(d, visible, a == null ? "空闲" : phaseLabel(a),
+                    maintByDock.get(d.getId())));
         }
 
         // 等待车辆：已进场未派台优先，已叫号未靠台次之（与队列排序一致）

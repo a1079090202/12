@@ -43,7 +43,11 @@
       "Bash(find / -maxdepth 6 -name \"javac\")",
       "Bash(JAVA_HOME=/home/node/tools/jdk-21.0.12.1+1 /home/node/tools/apache-maven-3.9.9/bin/mvn -q -o test -Dtest='CodeGenerationTest,AuditTrailTest' -Dsurefire.failIfNoSpecifiedTests=false 2>&1 | tail -25; echo \"EXIT=$?\")",
       "Bash(JAVA_HOME=/home/node/tools/jdk-21.0.12.1+1 /home/node/tools/apache-maven-3.9.9/bin/mvn -o test)",
-      "Bash(mvn -v)"
+      "Bash(mvn -v)",
+      "Bash(apt-get update *)",
+      "Bash(apt-get install *)",
+      "Bash(curl -sL --connect-timeout 15 -o jdk21.tar.gz \"https://api.adoptium.net/v3/binary/latest/21/ga/linux/x64/jdk/hotspot/normal/eclipse\")",
+      "Bash(curl -sL --retry 2 -o jdk21.tar.gz \"https://mirrors.tuna.tsinghua.edu.cn/Adoptium/21/jdk/x64/linux/OpenJDK21U-jdk_x64_linux_hotspot_21.0.12.1_1.tar.gz\")"
     ]
   }
 }

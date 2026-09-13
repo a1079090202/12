@@ -17,11 +17,16 @@
 
     <div class="docks" style="margin-top:14px">
       <div class="dock-card" th:each="ds : ${view.dockStatuses}"
-           th:classappend="${ds.appt != null} ? 'busy' : 'free'">
+           th:classappend="${ds.underMaintenance() ? 'maint' : (ds.appt != null ? 'busy' : 'free')}">
         <div class="dock-code" th:text="${ds.dock.code}">D1</div>
         <div class="dock-type" th:text="${ds.dock.dockType.label}">普通月台</div>
+        <span class="badge maint" th:if="${ds.underMaintenance()}">🔧 保养中
+          <span th:text="${clock.formatTime(ds.maintenance.windowStart)}"></span>–<span
+              th:text="${clock.formatTime(ds.maintenance.windowEnd)}"></span></span>
         <span class="badge" th:classappend="${ds.appt != null} ? 'busy' : 'free'"
-              th:text="${ds.phase}">空闲</span>
+              th:text="${ds.phase}" th:unless="${ds.underMaintenance()}">空闲</span>
+        <div th:if="${ds.underMaintenance()}" class="muted" style="font-size:12px;margin-top:4px"
+             th:text="${#strings.abbreviate(ds.maintenance.reason,14)}">例行保养</div>
         <div th:if="${ds.appt != null}" style="margin-top:8px;font-size:13px">
           <div class="mono" th:text="${ds.appt.plateNo}">沪A1234</div>
           <div class="muted" th:text="${#strings.abbreviate(ds.appt.cargoType,12)}">货类</div>

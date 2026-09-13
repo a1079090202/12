@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head th:replace="~{fragments/layout :: head('月台保养停用')}"></head>
+<body>
+<nav th:replace="~{fragments/layout :: nav}"></nav>
+<div class="container">
+
+  <div th:if="${param.registered}" class="flash ok">停用登记已提交，受影响预约清单见下方（登记本身不改动任何预约）。</div>
+  <div th:if="${param.cancelled}" class="flash ok">该停用登记已取消，月台容量即时恢复。</div>
+
+  <div class="grid grid-2">
+    <div class="panel">
+      <h2>登记月台停用</h2>
+      <p class="muted">停用窗内，该月台所属类型的可约容量相应扣减（如唯一冷藏月台停用，该时段冷藏无法再约）。窗内已有预约请到停用详情逐条改期或标记改约待定。</p>
+      <form class="stacked" th:action="@{/maintenance}" method="post">
+        <label>月台</label>
+        <select name="dockId" required>
+          <option value="" disabled selected>请选择月台</option>
+          <option th:each="d : ${docks}" th:value="${d.id}"
+                  th:text="${d.code} + ' · ' + ${d.name} + '（' + ${d.dockType.label} + '）'"></option>
+        </select>
+        <label>停用日期</label>
+        <input type="date" name="date" required th:min="${today}">
+        <div style="display:flex;gap:10px">
+          <div style="flex:1">
+            <label>开始时间</label>
+            <select name="startHM" required>
+              <option th:each="t : ${slotTimes}" th:value="${t}" th:text="${t}"></option>
+            </select>
+          </div>
+          <div style="flex:1">
+            <label>结束时间</label>
+            <select name="endHM" required>
+              <option th:each="t : ${slotTimes}" th:value="${t}" th:text="${t}"
+                      th:selected="${t == '12:00'}"></option>
+            </select>
+          </div>
+        </div>
+        <label>停用原因（必填）</label>
+        <textarea name="reason" rows="3" maxlength="500" required
+                  placeholder="如：设备科安排半天例行保养"></textarea>
+        <div style="margin-top:12px"><button class="btn" type="submit">登记停用</button></div>
+      </form>
+    </div>
+
+    <div class="panel">
+      <h2>停用记录</h2>
+      <table>
+        <thead><tr><th>月台</th><th>停用时段</th><th>原因</th><th>状态</th><th></th></tr></thead>
+        <tbody>
+        <tr th:each="m : ${list}">
+          <td class="nowrap" th:text="${ref.dockCode(m.dockId)}"></td>
+          <td class="nowrap"
+              th:text="${clock.formatDateTime(m.windowStart)} + ' – ' + ${clock.formatTime(m.windowEnd)}"></td>
+          <td th:text="${m.reason}"></td>
+          <td>
+            <span class="badge late" th:if="${m.status == 'SCHEDULED'}">生效中</span>
+            <span class="badge gray" th:if="${m.status == 'CANCELLED'}">已取消</span>
+          </td>
+          <td><a class="btn small secondary" th:href="@{/maintenance/{id}(id=${m.id})}">查看/处置</a></td>
+        </tr>
+        <tr th:if="${list.isEmpty()}"><td colspan="5" class="muted">还没有停用登记。</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+</body>
+</html>

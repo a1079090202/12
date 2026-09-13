@@ -49,11 +49,11 @@ class CoreFlowConcurrencyTest extends AbstractIntegrationTest {
     private static final ZoneId ZONE = YardClock.ZONE;
     private final LocalDate day = LocalDate.now(ZONE).plusDays(14);
 
-    // ---- 预约：同一 30 分钟槽并发下单，容量 6 绝不被突破 --------------------
+    // ---- 预约：同一 30 分钟槽并发下单，容量（可用普通月台 4 个）绝不被突破 ----
 
     @Test
     void concurrent_bookings_same_slot_never_exceed_capacity() throws Exception {
-        int threads = 12; // 容量 6 的两倍
+        int threads = 12; // 容量 4 的三倍
         runParallel(threads, i -> {
             loginAs("carrier1");
             appointmentService.book(booking("并发车牌" + String.format("%03d", i)),
@@ -63,7 +63,7 @@ class CoreFlowConcurrencyTest extends AbstractIntegrationTest {
         Instant slot = yardClock.truncateToSlot(yardClock.parseDateTime(day, "13:00"), 30);
         long activeInSlot = appointmentRepository
                 .countBySlotStartAndStatusNot(slot, AppointmentStatus.CANCELLED);
-        assertThat(activeInSlot).as("同一槽位有效预约数不得超过容量 6").isEqualTo(6);
+        assertThat(activeInSlot).as("同一槽位有效预约数不得超过容量 4（D1–D4 普通月台）").isEqualTo(4);
     }
 
     // ---- 进场：同一预约码被两个门卫同时扫，只能放行一次 --------------------

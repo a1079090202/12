@@ -33,8 +33,8 @@
             <select name="dockId">
               <option value="">自动分配</option>
               <option th:each="d : ${docks}" th:value="${d.id}"
-                      th:text="${d.code} + ' · ' + ${d.dockType.label}"
-                      th:disabled="${d.dockType != a.dockType}"></option>
+                      th:text="${d.code + ' · ' + d.dockType.label + (blockedDockIds.contains(d.id) ? '（保养停用）' : '')}"
+                      th:disabled="${d.dockType != a.dockType || blockedDockIds.contains(d.id)}"></option>
             </select>
             <button class="btn small" type="submit"
                     th:disabled="${a.status.name()!='GATED_IN'}">叫号</button>
